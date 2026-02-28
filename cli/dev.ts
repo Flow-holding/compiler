@@ -58,6 +58,15 @@ export async function cmdDev() {
     let rebuilding = false
     let lastMods: Record<string, number> = {}
 
+    // Inizializza lastMods con i mtime attuali così il primo check non triggera rebuild
+    const initGlob = new Bun.Glob("**/*.flow")
+    for await (const file of initGlob.scan(srcDir2)) {
+        const full = join(srcDir2, file)
+        const stat = await Bun.file(full).stat?.()
+        const mod  = stat?.mtime instanceof Date ? stat.mtime.getTime() : Number(stat?.mtime ?? 0)
+        lastMods[full] = mod
+    }
+
     setInterval(async () => {
         if (rebuilding) return
         try {
