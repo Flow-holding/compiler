@@ -1,0 +1,10 @@
+{
+    "name": "flowc",
+    "version": "0.1.0",
+    "description": "Flow language compiler",
+    "scripts": {
+        "dev":   "bun run src/main.ts",
+        "build": "bun build src/main.ts --compile --outfile flowc",
+        "test":  "bun test"
+    }
+}
