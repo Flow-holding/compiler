@@ -2,7 +2,7 @@ import * as AST from "../parser/ast"
 
 export type CodegenTarget = "native" | "wasm"
 
-export function codegen(program: AST.Program, target: CodegenTarget = "native"): string {
+export function codegen(program: AST.Program, target: CodegenTarget = "native", runtimeDir?: string): string {
     const lines: string[] = []
     let indent = 0
 
@@ -270,12 +270,15 @@ export function codegen(program: AST.Program, target: CodegenTarget = "native"):
 
     // ── Header includes ───────────────────────────
 
+    // Normalizza i path con slash forward (clang non accetta backslash su Windows)
+    const rt = (runtimeDir ?? "../../runtime").replace(/\\/g, "/")
+
     if (target === "wasm") {
-        emit('#include "../../runtime/wasm/runtime.c"')
+        emit(`#include "${rt}/wasm/runtime.c"`)
     } else {
-        emit('#include "../../runtime/io/print.c"')
-        emit('#include "../../runtime/io/fs.c"')
-        emit('#include "../../runtime/net/http.c"')
+        emit(`#include "${rt}/io/print.c"`)
+        emit(`#include "${rt}/io/fs.c"`)
+        emit(`#include "${rt}/net/http.c"`)
     }
     emit("")
 

@@ -1,7 +1,7 @@
 # install.ps1 — Installa flow su Windows
 # Uso: irm https://github.com/flow-lang/flow/releases/latest/download/install.ps1 | iex
 
-$REPO    = "flow-lang/flow"
+$REPO    = "Flow-holding/compiler"
 $BIN_DIR = "$env:LOCALAPPDATA\flow\bin"
 $EXE     = "$BIN_DIR\flow.exe"
 

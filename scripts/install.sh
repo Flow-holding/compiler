@@ -2,7 +2,7 @@
 # install.sh — Installa flow su macOS / Linux
 # Uso: curl -fsSL https://github.com/flow-lang/flow/releases/latest/download/install.sh | sh
 
-REPO="flow-lang/flow"
+REPO="Flow-holding/compiler"
 BIN_DIR="$HOME/.flow/bin"
 EXE="$BIN_DIR/flow"
 

@@ -4,8 +4,8 @@ import { join }                     from "node:path"
 import { existsSync, readFileSync,
          writeFileSync }            from "node:fs"
 
-const RELEASES_URL = "https://api.github.com/repos/flow-lang/flow/releases/latest"
-const VERSION_URL  = "https://raw.githubusercontent.com/flow-lang/flow/main/VERSION"
+const RELEASES_URL = "https://api.github.com/repos/Flow-holding/compiler/releases/latest"
+const VERSION_URL  = "https://raw.githubusercontent.com/Flow-holding/compiler/main/VERSION"
 
 // Versione corrente (aggiornata dal build script)
 export const CURRENT_VERSION = "0.1.0"

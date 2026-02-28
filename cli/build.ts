@@ -57,7 +57,7 @@ export async function build(options: BuildOptions = {}) {
     // ── C nativo ─────────────────────────────────────────
     const cPath   = join(outDir, name + ".c")
     const exePath = join(outDir, name + ".exe")
-    await Bun.write(cPath, codegen(ast, "native"))
+    await Bun.write(cPath, codegen(ast, "native", runtimeDir))
 
     const native = Bun.spawnSync(["clang", cPath, "-o", exePath,
         ...(options.prod ? ["-O2"] : ["-g"])])
@@ -71,7 +71,7 @@ export async function build(options: BuildOptions = {}) {
     // ── WASM ─────────────────────────────────────────────
     const cWasmPath = join(outDir, name + ".wasm.c")
     const wasmPath  = join(outDir, "app.wasm")
-    await Bun.write(cWasmPath, codegen(ast, "wasm"))
+    await Bun.write(cWasmPath, codegen(ast, "wasm", runtimeDir))
 
     const wasm = Bun.spawnSync([
         "clang", "--target=wasm32-unknown-unknown",

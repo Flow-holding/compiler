@@ -1,7 +1,0 @@
-{
-    "name": "hello",
-    "version": "0.1.0",
-    "entry": "hello.flow",
-    "target": ["web"],
-    "out": "out"
-}
