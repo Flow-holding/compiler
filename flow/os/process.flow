@@ -1,0 +1,25 @@
+// process — esecuzione comandi, env, exit
+// Solo su native. Su web: stub ritorna null/0, exit è no-op
+
+@native("flow_process_spawn")
+fn spawn(cmd: str, args?: str[]): ?int
+
+@native("flow_process_spawn_wait")
+fn spawn_wait(pid: int): int
+
+@native("flow_process_exit")
+fn exit(code: int): never
+
+@native("flow_process_env")
+fn env(key: str): ?str
+
+@native("flow_process_cwd")
+fn cwd(): str
+
+@native("flow_process_chdir")
+fn chdir(path: str): bool
+
+// Uso:
+// let pid = process.spawn("ls", ["-la"])
+// process.env("HOME")
+// process.exit(0)

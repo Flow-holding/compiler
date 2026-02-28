@@ -86,6 +86,7 @@ static void pipeline(
     const char* input_path,
     const char* out_dir,
     const char* runtime_dir,
+    const char* native_map_path,
     bool        do_run,
     bool        prod
 ) {
@@ -127,7 +128,7 @@ static void pipeline(
 
     // ── Codegen C nativo
     char c_path[512]; snprintf(c_path, sizeof(c_path), "%s/%s.c", out_dir, stem);
-    Str c_code = codegen_c(&arena, ast, TARGET_NATIVE, runtime_dir);
+    Str c_code = codegen_c(&arena, ast, TARGET_NATIVE, runtime_dir, native_map_path);
     write_file(c_path, c_code.data);
 
     // ── Compila .exe
@@ -146,12 +147,12 @@ static void pipeline(
     // ── Codegen WASM
     char wasm_c[512]; snprintf(wasm_c, sizeof(wasm_c), "%s/%s.wasm.c", out_dir, stem);
     char wasm_path[512]; snprintf(wasm_path, sizeof(wasm_path), "%s/app.wasm", out_dir);
-    Str wasm_code = codegen_c(&arena, ast, TARGET_WASM, runtime_dir);
+    Str wasm_code = codegen_c(&arena, ast, TARGET_WASM, runtime_dir, native_map_path);
     write_file(wasm_c, wasm_code.data);
 
     snprintf(cmd, sizeof(cmd),
         "clang --target=wasm32-unknown-unknown -nostdlib "
-        "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export-dynamic "
+        "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export=main "
         "-D_CRT_SECURE_NO_WARNINGS -w %s \"%s\" -o \"%s\"",
         prod ? "-O2" : "-O1", wasm_c, wasm_path);
     if (run_cmd(cmd) == 0) printf("  .wasm   %s\n", wasm_path);
@@ -209,15 +210,19 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const char* input_path  = NULL;
-    const char* out_dir_arg = NULL;
-    bool        do_run      = false;
-    bool        prod        = false;
+    const char* input_path     = NULL;
+    const char* out_dir_arg    = NULL;
+    const char* runtime_arg    = NULL;
+    const char* native_map_arg = NULL;
+    bool        do_run         = false;
+    bool        prod           = false;
 
     for (int i = 1; i < argc; i++) {
-        if (str_eq(argv[i], "--run"))  { do_run = true; continue; }
-        if (str_eq(argv[i], "--prod")) { prod = true;   continue; }
-        if (str_eq(argv[i], "--outdir") && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
+        if (str_eq(argv[i], "--run"))       { do_run = true; continue; }
+        if (str_eq(argv[i], "--prod"))      { prod = true;   continue; }
+        if (str_eq(argv[i], "--outdir")     && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
+        if (str_eq(argv[i], "--runtime")    && i + 1 < argc) { runtime_arg = argv[++i]; continue; }
+        if (str_eq(argv[i], "--native-map") && i + 1 < argc) { native_map_arg = argv[++i]; continue; }
         if (!input_path) input_path = argv[i];
     }
 
@@ -235,16 +240,22 @@ int main(int argc, char** argv) {
         snprintf(out_dir, sizeof(out_dir), "%s/out", dir);
     }
 
-    // Runtime dir — cerca prima accanto al compiler, poi ~/.flow/runtime
-    char runtime_dir[512] = "../../runtime";
+    // Runtime dir — --runtime > ~/.flow/runtime
+    char runtime_dir[512];
+    if (runtime_arg) {
+        snprintf(runtime_dir, sizeof(runtime_dir), "%s", runtime_arg);
+    } else {
 #ifdef _WIN32
-    const char* userprofile = getenv("USERPROFILE");
-    if (userprofile) snprintf(runtime_dir, sizeof(runtime_dir), "%s/.flow/runtime", userprofile);
+        const char* userprofile = getenv("USERPROFILE");
+        if (userprofile) snprintf(runtime_dir, sizeof(runtime_dir), "%s/.flow/runtime", userprofile);
+        else strcpy(runtime_dir, "../../runtime");
 #else
-    const char* home = getenv("HOME");
-    if (home) snprintf(runtime_dir, sizeof(runtime_dir), "%s/.flow/runtime", home);
+        const char* home = getenv("HOME");
+        if (home) snprintf(runtime_dir, sizeof(runtime_dir), "%s/.flow/runtime", home);
+        else strcpy(runtime_dir, "../../runtime");
 #endif
+    }
 
-    pipeline(input_path, out_dir, runtime_dir, do_run, prod);
+    pipeline(input_path, out_dir, runtime_dir, native_map_arg, do_run, prod);
     return 0;
 }

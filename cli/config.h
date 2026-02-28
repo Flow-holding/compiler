@@ -4,6 +4,7 @@ typedef struct {
     char *name;
     char *entry;
     char *out;
+    char *runtime;
 } FlowConfig;
 
 /* Legge flow.config.json dalla cwd. Ritorna 1 ok, 0 errore. */

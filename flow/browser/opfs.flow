@@ -1,0 +1,20 @@
+// opfs — Origin Private File System
+// Storage persistente nel browser, usato da SQLite WASM
+// Solo su web. Su native: stub ritorna null/0
+
+@native("flow_opfs_get_directory")
+fn get_directory(): ?any
+
+@native("flow_opfs_create_file")
+fn create_file(dir: any, path: str): ?any
+
+@native("flow_opfs_read_file")
+fn read_file(handle: any): ?str
+
+@native("flow_opfs_write_file")
+fn write_file(handle: any, content: str): bool
+
+@native("flow_opfs_close")
+fn close(handle: any)
+
+// Uso con SQLite WASM per persistenza

@@ -101,3 +101,24 @@ FlowObject* flow_array_get(FlowArray* arr, int32_t i) {
 }
 
 int32_t flow_array_len(FlowArray* arr) { return arr->len; }
+
+// ── Stub native-only (fs, process) — su web ritornano null/0 ─────────────
+// Evita crash: l'app funziona, le feature non disponibili restano silenti
+
+FlowStr* flow_fs_read(const char* path) { (void)path; return NULL; }
+int32_t flow_fs_write(const char* path, FlowStr* s) { (void)path; (void)s; return 0; }
+int32_t flow_fs_exists(const char* path) { (void)path; return 0; }
+int32_t flow_fs_delete(const char* path) { (void)path; return 0; }
+int32_t flow_fs_mkdir(const char* path) { (void)path; return 0; }
+int32_t flow_fs_rmdir(const char* path) { (void)path; return 0; }
+FlowArray* flow_fs_list_dir(const char* path) { (void)path; return flow_array_new(); }
+int32_t flow_fs_is_dir(const char* path) { (void)path; return 0; }
+int32_t flow_fs_is_file(const char* path) { (void)path; return 0; }
+int32_t flow_fs_size(const char* path) { (void)path; return 0; }
+
+FlowStr* flow_process_env(const char* key) { (void)key; return NULL; }
+FlowStr* flow_process_cwd(void) { return flow_str_new(""); }
+int32_t flow_process_chdir(const char* path) { (void)path; return 0; }
+int32_t flow_process_spawn(const char* cmd, FlowArray* args) { (void)cmd; (void)args; return 0; }
+int32_t flow_process_spawn_wait(int32_t pid) { (void)pid; return -1; }
+void flow_process_exit(int32_t code) { (void)code; __builtin_unreachable(); }

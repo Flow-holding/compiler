@@ -61,12 +61,23 @@ export async function getFlowc(): Promise<string | null> {
 export async function runFlowc(
     inputPath: string,
     outDir:    string,
-    opts: { run?: boolean; prod?: boolean } = {}
+    opts: { run?: boolean; prod?: boolean; runtime?: string; nativeMap?: string } = {}
 ): Promise<boolean> {
     const flowc = await getFlowc()
     if (!flowc) return false
 
     const args = [flowc, inputPath, "--outdir", outDir]
+
+    // In dev: usa runtime dalla repo (modifiche flow/runtime subito visibili)
+    const runtimePath = opts.runtime ?? (() => {
+        const flowcDir = join(flowc, "..")
+        const rt = join(flowcDir, "..", "runtime")
+        if (flowcDir.includes("compiler") && existsSync(join(rt, "wasm", "runtime.c"))) return rt
+        return null
+    })()
+
+    if (runtimePath) args.push("--runtime", runtimePath)
+    if (opts.nativeMap) args.push("--native-map", opts.nativeMap)
     if (opts.run)  args.push("--run")
     if (opts.prod) args.push("--prod")
 

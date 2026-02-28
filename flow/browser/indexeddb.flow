@@ -1,0 +1,24 @@
+// indexeddb — storage browser key-value con indici
+// Solo su web. Su native: stub ritorna null/err
+
+@native("flow_idb_open")
+fn open(db_name: str, version?: int): ?any
+
+@native("flow_idb_create_store")
+fn create_store(db: any, store_name: str, key_path?: str): bool
+
+@native("flow_idb_put")
+fn put(db: any, store: str, key: str, value: str): bool
+
+@native("flow_idb_get")
+fn get(db: any, store: str, key: str): ?str
+
+@native("flow_idb_delete")
+fn delete(db: any, store: str, key: str): bool
+
+@native("flow_idb_close")
+fn close(db: any)
+
+// Uso:
+// let db = indexeddb.open("myapp")
+// if db != null { indexeddb.put(db, "users", "1", json) }

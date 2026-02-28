@@ -1,6 +1,7 @@
 #pragma once
 
 // ── Tipi base ────────────────────────────────────────────
+#define NULL ((void*)0)
 typedef unsigned int   size_t;
 typedef int            int32_t;
 typedef unsigned int   uint32_t;

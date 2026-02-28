@@ -1,0 +1,30 @@
+// storage — localStorage e sessionStorage
+// Solo su web. Su native: stub ritorna null/0
+
+@native("flow_storage_local_get")
+fn local_get(key: str): ?str
+
+@native("flow_storage_local_set")
+fn local_set(key: str, value: str)
+
+@native("flow_storage_local_remove")
+fn local_remove(key: str)
+
+@native("flow_storage_local_clear")
+fn local_clear()
+
+@native("flow_storage_session_get")
+fn session_get(key: str): ?str
+
+@native("flow_storage_session_set")
+fn session_set(key: str, value: str)
+
+@native("flow_storage_session_remove")
+fn session_remove(key: str)
+
+@native("flow_storage_session_clear")
+fn session_clear()
+
+// Uso:
+// storage.local_set("token", jwt)
+// let t = storage.local_get("token")

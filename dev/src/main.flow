@@ -1,7 +1,9 @@
-// {{name}}
+// dev — sandbox per provare modifiche a flow/, flow-os/, runtime/
+// Esegui da qui: flow dev
+// Usa runtime/ e compiler/ dalla repo (modifiche subito visibili)
 
 fn main() {
-    print("Ciao da {{name}}")
+    print("Ciao da dev")
 }
 
 @client
@@ -12,7 +14,7 @@ component App() {
         style: style({ padding: 24, gap: 16 })
 
         Text {
-            value: "Benvenuto in {{name}}"
+            value: "Benvenuto in dev"
             style: style({ size: 28, weight: "bold", color: "#111" })
         }
 

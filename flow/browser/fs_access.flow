@@ -1,0 +1,14 @@
+// fs_access — File System Access API (showOpenFilePicker, showSaveFilePicker)
+// Permette accesso a file scelti dall'utente. Solo su web.
+// Su native: stub ritorna null
+
+@native("flow_fs_pick_file")
+fn pick_file(accept?: str): ?str
+
+@native("flow_fs_pick_directory")
+fn pick_directory(): ?str
+
+@native("flow_fs_save_file")
+fn save_file(content: str, suggested_name?: str): bool
+
+// L'utente deve concedere permesso via dialog del browser

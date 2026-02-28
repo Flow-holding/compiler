@@ -15,13 +15,89 @@ static const char* native_map[][2] = {
     { "read",    "flow_fs_read"     },
     { "write",   "flow_fs_write"    },
     { "exists",  "flow_fs_exists"   },
+    { "mkdir",   "flow_fs_mkdir"    },
+    { "rmdir",   "flow_fs_rmdir"    },
+    { "list_dir","flow_fs_list_dir" },
+    { "is_dir",  "flow_fs_is_dir"   },
+    { "is_file", "flow_fs_is_file"  },
+    { "size",    "flow_fs_size"     },
+    { "spawn",   "flow_process_spawn"     },
+    { "spawn_wait","flow_process_spawn_wait"},
+    { "exit",    "flow_process_exit" },
+    { "env",     "flow_process_env"  },
+    { "cwd",     "flow_process_cwd"  },
+    { "chdir",   "flow_process_chdir"},
     { NULL, NULL }
 };
 
-static const char* resolve_native(const char* name) {
+#define DYN_MAP_MAX 256
+static char dyn_map_keys[DYN_MAP_MAX][64];
+static char dyn_map_vals[DYN_MAP_MAX][64];
+static int  dyn_map_n = 0;
+
+static void load_dyn_native_map(const char* path) {
+    dyn_map_n = 0;
+    if (!path) return;
+    FILE* f = fopen(path, "r");
+    if (!f) return;
+    char line[256];
+    while (dyn_map_n < DYN_MAP_MAX && fgets(line, sizeof(line), f)) {
+        char* eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        char* key = line;
+        char* val = eq + 1;
+        while (*val == ' ' || *val == '\t') val++;
+        char* end = val + strlen(val);
+        while (end > val && (end[-1] == '\n' || end[-1] == '\r')) *--end = '\0';
+        if (strlen(key) < 60 && strlen(val) < 60) {
+            strcpy(dyn_map_keys[dyn_map_n], key);
+            strcpy(dyn_map_vals[dyn_map_n], val);
+            dyn_map_n++;
+        }
+    }
+    fclose(f);
+}
+
+static const char* resolve_native(const char* base, const char* member) {
+    char key[128];
+    if (base && base[0]) {
+        snprintf(key, sizeof(key), "%s.%s", base, member);
+    } else {
+        snprintf(key, sizeof(key), "%s", member ? member : "");
+    }
+    for (int i = 0; i < dyn_map_n; i++)
+        if (str_eq(key, dyn_map_keys[i])) return dyn_map_vals[i];
     for (int i = 0; native_map[i][0]; i++)
-        if (str_eq(name, native_map[i][0])) return native_map[i][1];
-    return name;
+        if (str_eq(member ? member : key, native_map[i][0])) return native_map[i][1];
+    return member ? member : key;
+}
+
+// Per WASM: ritorna stub (default) per funzioni native-only, altrimenti NULL
+static const char* native_only_stub(CodegenTarget target, const char* base, const char* member) {
+    if (target != TARGET_WASM) return NULL;
+    if (!base || !member) return NULL;
+    if (str_eq(base, "fs")) {
+        if (str_eq(member, "read"))       return "NULL";
+        if (str_eq(member, "write"))     return "0";
+        if (str_eq(member, "exists"))    return "0";
+        if (str_eq(member, "delete"))    return "0";
+        if (str_eq(member, "mkdir"))     return "0";
+        if (str_eq(member, "rmdir"))     return "0";
+        if (str_eq(member, "list_dir"))  return "flow_array_new()";
+        if (str_eq(member, "is_dir"))    return "0";
+        if (str_eq(member, "is_file"))   return "0";
+        if (str_eq(member, "size"))      return "0";
+    }
+    if (str_eq(base, "process")) {
+        if (str_eq(member, "spawn"))      return "0";
+        if (str_eq(member, "spawn_wait")) return "-1";
+        if (str_eq(member, "exit"))       return "__builtin_unreachable()";
+        if (str_eq(member, "env"))        return "NULL";
+        if (str_eq(member, "cwd"))        return "flow_str_new(\"\")";
+        if (str_eq(member, "chdir"))      return "0";
+    }
+    return NULL;
 }
 
 // ── Utility ──────────────────────────────────────────────────────
@@ -66,6 +142,8 @@ static const char* gen_type(Node* t) {
 }
 
 // ── Generatore espressioni C ─────────────────────────────────────
+
+static CodegenTarget _target = TARGET_NATIVE;
 
 static void gen_expr(Str* out, Node* n) {
     if (!n) return;
@@ -120,14 +198,20 @@ static void gen_expr(Str* out, Node* n) {
             break;
 
         case ND_CALL: {
-            // Funzione libera: risolvi native binding se esiste
-            str_cat(out, resolve_native(n->name ? n->name : ""));
-            str_cat(out, "(");
-            for (int i = 0; i < n->children.len; i++) {
-                if (i > 0) str_cat(out, ", ");
-                gen_expr(out, (Node*)n->children.data[i]);
+            // Su WASM: sostituisci fs/process con stub (default)
+            const char* base = (n->left && n->left->kind == ND_IDENT) ? n->left->name : NULL;
+            const char* stub = native_only_stub(_target, base, n->name);
+            if (stub) {
+                str_cat(out, stub);
+            } else {
+                str_cat(out, resolve_native(base, n->name ? n->name : ""));
+                str_cat(out, "(");
+                for (int i = 0; i < n->children.len; i++) {
+                    if (i > 0) str_cat(out, ", ");
+                    gen_expr(out, (Node*)n->children.data[i]);
+                }
+                str_cat(out, ")");
             }
-            str_cat(out, ")");
             break;
         }
 
@@ -280,14 +364,14 @@ static void gen_top(Str* out, Node* n, CodegenTarget target) {
             // Funzione @native — solo dichiarazione
             if (n->annotation && str_eq(n->annotation->name, "native")) break;
 
-            // Attributo export per WASM
-            if (target == TARGET_WASM)
+            // Attributo export per WASM (main esportato via -Wl,--export=main)
+            if (target == TARGET_WASM && !str_eq(n->name, "main"))
                 str_catf(out, "__attribute__((export_name(\"%s\")))\n", n->name);
 
             // main() deve restituire int in C
             const char* ret = str_eq(n->name, "main") ? "int" : gen_type(n->type);
             str_cat(out, ret);
-            str_cat(out, " "); str_cat(out, resolve_native(n->name)); str_cat(out, "(");
+            str_cat(out, " "); str_cat(out, resolve_native(NULL, n->name)); str_cat(out, "(");
             for (int i = 0; i < n->params.len; i++) {
                 Param* p = (Param*)n->params.data[i];
                 if (i > 0) str_cat(out, ", ");
@@ -325,7 +409,9 @@ static void gen_top(Str* out, Node* n, CodegenTarget target) {
     }
 }
 
-Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime_dir) {
+Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime_dir, const char* native_map_path) {
+    _target = target;
+    load_dyn_native_map(native_map_path);
     Str out = str_new();
     char rt[512];
     snprintf(rt, sizeof(rt), "%s", runtime_dir ? runtime_dir : "../../runtime");
@@ -338,6 +424,7 @@ Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime
     } else {
         str_catf(&out, "#include \"%s/io/print.c\"\n", rt);
         str_catf(&out, "#include \"%s/io/fs.c\"\n", rt);
+        str_catf(&out, "#include \"%s/os/process.c\"\n", rt);
         str_catf(&out, "#include \"%s/net/http.c\"\n\n", rt);
     }
 
@@ -376,10 +463,10 @@ static void gen_ui_node(Str* html, Node* n, int ind) {
     }
     str_cat(html, ">\n");
 
-    // Testo interno
+    // Testo interno (text per Button, value per Text)
     for (int i = 0; i < n->style.len; i++) {
         Field* f = (Field*)n->style.data[i];
-        if (str_eq(f->name, "text") && f->value && f->value->value) {
+        if ((str_eq(f->name, "text") || str_eq(f->name, "value")) && f->value && f->value->value) {
             for (int j = 0; j < ind + 1; j++) str_cat(html, "  ");
             str_catf(html, "%s\n", f->value->value);
         }
@@ -395,28 +482,34 @@ static void gen_ui_node(Str* html, Node* n, int ind) {
 
 Str codegen_html(Arena* a, Node* program) {
     Str out = str_new();
+    Str css = codegen_css(a, program);
     str_cat(&out,
         "<!DOCTYPE html>\n<html lang=\"it\">\n<head>\n"
         "  <meta charset=\"UTF-8\">\n"
         "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
         "  <title>Flow App</title>\n"
-        "  <link rel=\"stylesheet\" href=\"style.css\">\n"
-        "</head>\n<body>\n  <div id=\"root\">\n");
+        "  <style>");
+    str_cat(&out, css.data);
+    str_cat(&out,
+        "</style>\n</head>\n<body>\n  <div id=\"root\">\n");
 
     for (int i = 0; i < program->children.len; i++) {
         Node* n = (Node*)program->children.data[i];
         if (n->kind == ND_COMPONENT_DECL && n->annotation &&
             str_eq(n->annotation->name, "client")) {
             if (n->body) {
-                for (int j = 0; j < n->body->children.len; j++)
-                    gen_ui_node(&out, (Node*)n->body->children.data[j], 2);
+                for (int j = 0; j < n->body->children.len; j++) {
+                    Node* stmt = (Node*)n->body->children.data[j];
+                    Node* root = (stmt->kind == ND_RETURN && stmt->left) ? stmt->left : stmt;
+                    gen_ui_node(&out, root, 2);
+                }
             }
         }
     }
 
     str_cat(&out,
         "  </div>\n"
-        "  <script src=\"app.js\"></script>\n"
+        "  <script defer src=\"app.js\"></script>\n"
         "</body>\n</html>\n");
     return out;
 }
@@ -427,8 +520,10 @@ Str codegen_css(Arena* a, Node* program) {
     Str out = str_new();
     str_cat(&out,
         "*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }\n"
-        "body { font-family: system-ui, sans-serif; }\n"
-        "#root { display: flex; flex-direction: column; min-height: 100vh; }\n\n");
+        "body { font-family: system-ui, sans-serif; background: #fff; }\n"
+        "#root { display: flex; flex-direction: column; min-height: 100vh; padding: 24px; gap: 16px; }\n"
+        "#root p { font-size: 28px; font-weight: bold; color: #111; }\n"
+        "#root button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 12px; cursor: pointer; }\n\n");
     return out;
 }
 
@@ -437,25 +532,33 @@ Str codegen_css(Arena* a, Node* program) {
 Str codegen_js(Arena* a, Node* program) {
     Str out = str_new();
     str_cat(&out,
-        "const memory = new WebAssembly.Memory({ initial: 16 });\n"
+        "let wasmMem;\n"
         "const imports = {\n"
         "  env: {\n"
-        "    memory,\n"
-        "    flow_js_print: (ptr, len) => {\n"
-        "      const buf = new Uint8Array(memory.buffer, ptr, len);\n"
-        "      console.log(new TextDecoder().decode(buf));\n"
+        "    flow_print_str: (ptr) => {\n"
+        "      const view = new Uint8Array(wasmMem.buffer);\n"
+        "      let end = ptr;\n"
+        "      while (view[end]) end++;\n"
+        "      console.log(new TextDecoder().decode(view.subarray(ptr, end)));\n"
         "    },\n"
-        "    flow_js_eprint: (ptr, len) => {\n"
-        "      const buf = new Uint8Array(memory.buffer, ptr, len);\n"
-        "      console.error(new TextDecoder().decode(buf));\n"
+        "    flow_eprint_str: (ptr) => {\n"
+        "      const view = new Uint8Array(wasmMem.buffer);\n"
+        "      let end = ptr;\n"
+        "      while (view[end]) end++;\n"
+        "      console.error(new TextDecoder().decode(view.subarray(ptr, end)));\n"
         "    },\n"
         "  }\n"
         "};\n\n"
-        "WebAssembly.instantiateStreaming(fetch('app.wasm'), imports)\n"
-        "  .then(({ instance }) => {\n"
-        "    window._flow = instance.exports;\n"
-        "    if (instance.exports.main) instance.exports.main();\n"
-        "  })\n"
-        "  .catch(err => console.error('WASM error:', err));\n");
+        "function loadWasm() {\n"
+        "  WebAssembly.instantiateStreaming(fetch('app.wasm'), imports)\n"
+        "    .then(({ instance }) => {\n"
+        "      wasmMem = instance.exports.memory;\n"
+        "      window._flow = instance.exports;\n"
+        "      if (instance.exports.main) instance.exports.main();\n"
+        "    })\n"
+        "    .catch(err => console.error('WASM error:', err));\n"
+        "}\n"
+        "if ('requestIdleCallback' in window) requestIdleCallback(loadWasm, { timeout: 100 });\n"
+        "else setTimeout(loadWasm, 0);\n");
     return out;
 }

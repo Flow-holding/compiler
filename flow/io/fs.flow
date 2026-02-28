@@ -10,8 +10,26 @@ fn exists(path: str): bool
 @native("flow_fs_delete")
 fn delete(path: str): bool
 
+@native("flow_fs_mkdir")
+fn mkdir(path: str): bool
+
+@native("flow_fs_rmdir")
+fn rmdir(path: str): bool
+
+@native("flow_fs_list_dir")
+fn list_dir(path: str): str[]
+
+@native("flow_fs_is_dir")
+fn is_dir(path: str): bool
+
+@native("flow_fs_is_file")
+fn is_file(path: str): bool
+
+@native("flow_fs_size")
+fn size(path: str): int
+
 // Uso:
 // fs.read("config.json")
 // fs.write("output.txt", testo)
-// fs.exists("file.flow")
-// fs.delete("temp.txt")
+// fs.mkdir("output")
+// let files = fs.list_dir(".")

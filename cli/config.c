@@ -41,9 +41,10 @@ int config_load(FlowConfig *cfg) {
         return 0;
     }
 
-    cfg->name  = json_str(json, "name");
-    cfg->entry = json_str(json, "entry");
-    cfg->out   = json_str(json, "out");
+    cfg->name    = json_str(json, "name");
+    cfg->entry   = json_str(json, "entry");
+    cfg->out     = json_str(json, "out");
+    cfg->runtime = json_str(json, "runtime");
     free(json);
 
     if (!cfg->entry) cfg->entry = str_dup("src/main.flow");
@@ -56,4 +57,5 @@ void config_free(FlowConfig *cfg) {
     free(cfg->name);
     free(cfg->entry);
     free(cfg->out);
+    free(cfg->runtime);
 }

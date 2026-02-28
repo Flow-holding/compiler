@@ -287,7 +287,7 @@ static void gen_top(Str* out, Node* n, CodegenTarget target) {
 
             // Attributo export per WASM
             if (target == TARGET_WASM)
-                str_catf(out, "__attribute__((export_name(\\"%s\\")))\\n", n->name);
+                if (!str_eq(n->name, "main")) str_catf(out, "__attribute__((export_name(\\"%s\\")))\\n", n->name);
 
             // main() deve restituire int in C
             const char* ret = str_eq(n->name, "main") ? "int" : gen_type(n->type);
@@ -442,22 +442,26 @@ Str codegen_css(Arena* a, Node* program) {
 Str codegen_js(Arena* a, Node* program) {
     Str out = str_new();
     str_cat(&out,
-        "const memory = new WebAssembly.Memory({ initial: 16 });\\n"
+        "let wasmMem;\\n"
         "const imports = {\\n"
         "  env: {\\n"
-        "    memory,\\n"
-        "    flow_js_print: (ptr, len) => {\\n"
-        "      const buf = new Uint8Array(memory.buffer, ptr, len);\\n"
-        "      console.log(new TextDecoder().decode(buf));\\n"
+        "    flow_print_str: (ptr) => {\\n"
+        "      const view = new Uint8Array(wasmMem.buffer);\\n"
+        "      let end = ptr;\\n"
+        "      while (view[end]) end++;\\n"
+        "      console.log(new TextDecoder().decode(view.subarray(ptr, end)));\\n"
         "    },\\n"
-        "    flow_js_eprint: (ptr, len) => {\\n"
-        "      const buf = new Uint8Array(memory.buffer, ptr, len);\\n"
-        "      console.error(new TextDecoder().decode(buf));\\n"
+        "    flow_eprint_str: (ptr) => {\\n"
+        "      const view = new Uint8Array(wasmMem.buffer);\\n"
+        "      let end = ptr;\\n"
+        "      while (view[end]) end++;\\n"
+        "      console.error(new TextDecoder().decode(view.subarray(ptr, end)));\\n"
         "    },\\n"
         "  }\\n"
         "};\\n\\n"
         "WebAssembly.instantiateStreaming(fetch('app.wasm'), imports)\\n"
         "  .then(({ instance }) => {\\n"
+        "    wasmMem = instance.exports.memory;\\n"
         "    window._flow = instance.exports;\\n"
         "    if (instance.exports.main) instance.exports.main();\\n"
         "  })\\n"
@@ -1077,7 +1081,7 @@ static void pipeline(
 
     snprintf(cmd, sizeof(cmd),
         "clang --target=wasm32-unknown-unknown -nostdlib "
-        "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export-dynamic "
+        "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export=main "
         "-D_CRT_SECURE_NO_WARNINGS -w %s \\"%s\\" -o \\"%s\\"",
         prod ? "-O2" : "-O1", wasm_c, wasm_path);
     if (run_cmd(cmd) == 0) printf("  .wasm   %s\\n", wasm_path);

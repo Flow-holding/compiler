@@ -216,10 +216,10 @@ int cmd_dev(void) {
     signal(SIGINT, handle_sigint);
 
     /* Banner */
-    printf("┌─────────────────────────────────┐\n");
-    printf("│  Flow dev server                │\n");
-    printf("│  http://localhost:3000          │\n");
-    printf("└─────────────────────────────────┘\n\n");
+    printf("+---------------------------------+\n");
+    printf("|  Flow dev server                |\n");
+    printf("|  http://localhost:3000          |\n");
+    printf("+---------------------------------+\n\n");
 
     /* Prima build */
     int code = cmd_build(0, 0);
