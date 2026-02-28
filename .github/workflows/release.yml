@@ -66,9 +66,8 @@ jobs:
 
       - name: Flatten artifact folders
         run: |
-          find dist -type f | while read f; do
-            mv "$f" "dist/$(basename $f)"
-          done
+          find dist -mindepth 2 -type f -exec mv {} dist/ \;
+          find dist -type d -empty -delete
 
       - name: Estrai versione
         id: version
