@@ -558,7 +558,7 @@ Str codegen_js(Arena* a, Node* program) {
         "    })\n"
         "    .catch(err => console.error('WASM error:', err));\n"
         "}\n"
-        "if ('requestIdleCallback' in window) requestIdleCallback(loadWasm, { timeout: 100 });\n"
-        "else setTimeout(loadWasm, 0);\n");
+        "if (document.readyState === 'complete') loadWasm();\n"
+        "else window.addEventListener('load', loadWasm);\n");
     return out;
 }
