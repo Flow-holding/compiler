@@ -5,6 +5,9 @@
 #include "cmd_build.h"
 #include "cmd_dev.h"
 #include "cmd_update.h"
+#ifdef _WIN32
+  #include <windows.h>
+#endif
 
 static const char *HELP =
     "\nFlow v" FLOW_VERSION " — linguaggio e framework universale\n"
@@ -21,6 +24,9 @@ static const char *HELP =
     "  flow dev\n\n";
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     const char *cmd = argc > 1 ? argv[1] : NULL;
 
     if (!cmd
