@@ -23,6 +23,9 @@ if (-not $asset) {
 Write-Host "Download $($release.tag_name)..."
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $EXE
 
+# Rimuove il flag "scaricato da internet" per evitare SmartScreen
+Unblock-File -Path $EXE
+
 # Aggiunge al PATH utente (persistente)
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($userPath -notlike "*$BIN_DIR*") {
