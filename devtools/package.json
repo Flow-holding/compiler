@@ -6,6 +6,7 @@
         "flow":          "bun run ../cli/main.ts",
         "build":         "bun run scripts/bundle-runtime.ts && bun build ../cli/main.ts --compile --outfile ../flow.exe",
         "release":       "bun run scripts/release.ts",
-        "release:patch": "bun run scripts/release.ts $(node -e \"const v=require('./package.json').version.split('.');v[2]++;console.log(v.join('.'))\")"
+        "release:patch": "bun run scripts/release.ts $(node -e \"const v=require('./package.json').version.split('.');v[2]++;console.log(v.join('.'))\")",
+        "publish":       "bun run scripts/publish.ts"
     }
 }
