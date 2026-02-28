@@ -13,69 +13,91 @@ jobs:
     name: Build ${{ matrix.display }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            outfile: flow-windows-x64.exe
-            lflags:  "-lws2_32"
-            display: Windows x64
+            flow_out:  flow-windows-x64.exe
+            flowc_out: flowc-windows-x64.exe
+            lflags:    "-lws2_32"
+            display:   Windows x64
 
           - os: ubuntu-latest
-            outfile: flow-linux-x64
-            lflags:  "-lpthread"
-            display: Linux x64
+            flow_out:  flow-linux-x64
+            flowc_out: flowc-linux-x64
+            lflags:    "-lpthread"
+            display:   Linux x64
 
           - os: ubuntu-latest
-            outfile: flow-linux-arm64
-            lflags:  "-lpthread"
-            cc:      "aarch64-linux-gnu-gcc"
-            display: Linux arm64
+            flow_out:  flow-linux-arm64
+            flowc_out: flowc-linux-arm64
+            cc:        aarch64-linux-gnu-gcc
+            lflags:    "-lpthread"
+            display:   Linux arm64
 
           - os: macos-latest
-            outfile: flow-macos-x64
-            lflags:  ""
-            display: macOS x64
+            flow_out:  flow-macos-x64
+            flowc_out: flowc-macos-x64
+            cc_flags:  "-arch x86_64"
+            lflags:    ""
+            display:   macOS x64
 
           - os: macos-latest
-            outfile: flow-macos-arm64
-            lflags:  ""
-            cc_flags: "-arch arm64"
-            display: macOS arm64
+            flow_out:  flow-macos-arm64
+            flowc_out: flowc-macos-arm64
+            cc_flags:  "-arch arm64"
+            lflags:    ""
+            display:   macOS arm64
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install cross-compiler (Linux arm64)
-        if: matrix.outfile == 'flow-linux-arm64'
+        if: matrix.flow_out == 'flow-linux-arm64'
         run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Build CLI
+      - name: Build CLI + flowc (Windows)
+        if: runner.os == 'Windows'
+        working-directory: cli
+        shell: pwsh
+        run: |
+          $CC = "clang"
+          $SRC = @("main.c","util.c","config.c","flowc.c","cmd_init.c","cmd_build.c","cmd_dev.c","cmd_update.c")
+          New-Item -ItemType Directory -Force -Path ../dist | Out-Null
+          & $CC -O2 -DNDEBUG @SRC -o "../dist/${{ matrix.flow_out }}" -lws2_32
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "✓ ${{ matrix.flow_out }}"
+
+          $CSRC = @("main.c","lexer/lexer.c","parser/parser.c","codegen/codegen.c")
+          Push-Location ../compiler
+          & $CC -O2 @CSRC -o "../dist/${{ matrix.flowc_out }}"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "✓ ${{ matrix.flowc_out }}"
+          Pop-Location
+
+      - name: Build CLI + flowc (Unix)
+        if: runner.os != 'Windows'
         working-directory: cli
         shell: bash
         run: |
           CC="${{ matrix.cc || 'clang' }}"
           SRC="main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c"
-          OUT="../dist/${{ matrix.outfile }}"
           mkdir -p ../dist
-          $CC -O2 -DNDEBUG ${{ matrix.cc_flags }} $SRC -o "$OUT" ${{ matrix.lflags }}
-          echo "✓ Built ${{ matrix.outfile }}"
 
-      - name: Build flowc
-        working-directory: compiler
-        shell: bash
-        run: |
-          CC="${{ matrix.cc || 'clang' }}"
-          EXT="${{ endsWith(matrix.outfile, '.exe') && '.exe' || '' }}"
-          PLATFORM="${{ startsWith(matrix.outfile, 'flow-windows') && 'windows' || startsWith(matrix.outfile, 'flow-macos') && 'macos' || 'linux' }}"
-          ARCH="${{ endsWith(matrix.outfile, 'arm64') || endsWith(matrix.outfile, 'arm64.exe') && 'arm64' || 'x64' }}"
-          OUT="../dist/flowc-${PLATFORM}-${ARCH}${EXT}"
-          $CC -O2 ${{ matrix.cc_flags }} main.c lexer/lexer.c parser/parser.c codegen/codegen.c -o "$OUT"
-          echo "✓ Built flowc-${PLATFORM}-${ARCH}${EXT}"
+          $CC -O2 -DNDEBUG ${{ matrix.cc_flags }} $SRC \
+            -o "../dist/${{ matrix.flow_out }}" ${{ matrix.lflags }}
+          echo "✓ ${{ matrix.flow_out }}"
 
-      - name: Upload artifact
+          cd ../compiler
+          $CC -O2 ${{ matrix.cc_flags }} \
+            main.c lexer/lexer.c parser/parser.c codegen/codegen.c \
+            -o "../dist/${{ matrix.flowc_out }}"
+          echo "✓ ${{ matrix.flowc_out }}"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.outfile }}
+          name: ${{ matrix.flow_out }}
           path: dist/
 
   release:
@@ -91,11 +113,12 @@ jobs:
         with:
           path: dist
 
-      - name: Flatten artifact folders
+      - name: Flatten + chmod
         run: |
           find dist -mindepth 2 -type f -exec mv {} dist/ \;
           find dist -type d -empty -delete
-          chmod +x dist/flow-linux-* dist/flow-macos-* dist/flowc-linux-* dist/flowc-macos-* 2>/dev/null || true
+          chmod +x dist/flow-linux-* dist/flow-macos-* \
+                    dist/flowc-linux-* dist/flowc-macos-* 2>/dev/null || true
 
       - name: Estrai versione
         id: version
@@ -121,7 +144,7 @@ jobs:
             curl -fsSL https://github.com/Flow-holding/compiler/releases/latest/download/install.sh | sh
             ```
 
-            ### Aggiornamento da versione precedente:
+            ### Aggiornamento:
             ```
             flow update
             ```
