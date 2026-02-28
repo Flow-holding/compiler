@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { writeFileSync, existsSync, mkdirSync } from "node:fs"
 
 const version = Bun.argv[2] ?? "0.1.0"
-const root    = join(import.meta.dir, "..")
+const root    = join(import.meta.dir, "../..")
 const distDir = join(root, "dist")
 
 if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true })

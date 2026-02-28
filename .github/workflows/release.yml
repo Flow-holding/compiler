@@ -40,10 +40,12 @@ jobs:
           bun-version: latest
 
       - name: Install deps
+        working-directory: devtools
         run: bun install
 
       - name: Build
-        run: bun run scripts/bundle-runtime.ts && bun build cli/main.ts --compile --target ${{ matrix.target }} --outfile dist/${{ matrix.outfile }}
+        working-directory: devtools
+        run: bun run scripts/bundle-runtime.ts && bun build ../cli/main.ts --compile --target ${{ matrix.target }} --outfile ../dist/${{ matrix.outfile }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -102,5 +104,5 @@ jobs:
             dist/flow-linux-x64
             dist/flow-macos-x64
             dist/flow-macos-arm64
-            scripts/install.ps1
-            scripts/install.sh
+            devtools/scripts/install.ps1
+            devtools/scripts/install.sh

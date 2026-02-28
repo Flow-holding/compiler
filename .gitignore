@@ -15,7 +15,9 @@ out/
 
 # Node / Bun
 node_modules/
+devtools/node_modules/
 bun.lock
+devtools/bun.lock
 
 # Flow cache locale
 .flow-runtime/
