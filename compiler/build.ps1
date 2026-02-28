@@ -3,7 +3,7 @@
 #      .\build.ps1 -prod    (ottimizzato)
 param([switch]$prod)
 
-$SRC   = @("main.c", "lexer.c", "parser.c", "codegen.c")
+$SRC   = @("main.c", "lexer/lexer.c", "parser/parser.c", "codegen/codegen.c")
 $OUT   = "flowc.exe"
 $FLAGS = if ($prod) { "-O2" } else { "-g -O0" }
 

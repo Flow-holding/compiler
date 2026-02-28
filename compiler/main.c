@@ -1,4 +1,4 @@
-#include "codegen.h"
+#include "codegen/codegen.h"
 #include <stdarg.h>
 #include <time.h>
 
@@ -210,12 +210,14 @@ int main(int argc, char** argv) {
     }
 
     const char* input_path  = NULL;
+    const char* out_dir_arg = NULL;
     bool        do_run      = false;
     bool        prod        = false;
 
     for (int i = 1; i < argc; i++) {
         if (str_eq(argv[i], "--run"))  { do_run = true; continue; }
         if (str_eq(argv[i], "--prod")) { prod = true;   continue; }
+        if (str_eq(argv[i], "--outdir") && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
         if (!input_path) input_path = argv[i];
     }
 
@@ -224,10 +226,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Cartella output accanto al sorgente
+    // Cartella output — usa --outdir se specificato, altrimenti accanto al sorgente
     char out_dir[512];
-    char dir[512]; path_dir(dir, sizeof(dir), input_path);
-    snprintf(out_dir, sizeof(out_dir), "%s/out", dir);
+    if (out_dir_arg) {
+        snprintf(out_dir, sizeof(out_dir), "%s", out_dir_arg);
+    } else {
+        char dir[512]; path_dir(dir, sizeof(dir), input_path);
+        snprintf(out_dir, sizeof(out_dir), "%s/out", dir);
+    }
 
     // Runtime dir — cerca prima accanto al compiler, poi ~/.flow/runtime
     char runtime_dir[512] = "../../runtime";

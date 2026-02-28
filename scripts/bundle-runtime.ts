@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
 
 const ROOT         = join(import.meta.dir, "..")
 const RUNTIME_DIR  = join(ROOT, "runtime")
-const OUT_FILE     = join(ROOT, "compiler", "runtime-bundle.ts")
+const OUT_FILE     = join(ROOT, "compiler-ts-unused", "runtime-bundle.ts")
 
 function collectFiles(dir: string, base: string = dir): Record<string, string> {
     const result: Record<string, string> = {}
