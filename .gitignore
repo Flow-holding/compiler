@@ -4,13 +4,21 @@
 *.out
 flowc
 
-# File di debug Windows (MSVC/clang)
+# File di debug Windows
 *.ilk
 *.pdb
 
 # Output build
 dist/
 build/
+out/
 
-# Node
+# Node / Bun
 node_modules/
+bun.lock
+
+# Flow cache locale
+.flow-runtime/
+
+# Cartelle locali di test
+examples/out/
