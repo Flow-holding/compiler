@@ -133,7 +133,7 @@ static void pipeline(
     // ── Compila .exe
     char exe_path[512]; snprintf(exe_path, sizeof(exe_path), "%s/%s%s", out_dir, stem, EXE_EXT);
     char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "clang \"%s\" -o \"%s\" %s",
+    snprintf(cmd, sizeof(cmd), "clang \"%s\" -o \"%s\" %s -D_CRT_SECURE_NO_WARNINGS -w",
         c_path, exe_path, prod ? "-O2" : "-g");
     int rc = run_cmd(cmd);
 
@@ -152,7 +152,7 @@ static void pipeline(
     snprintf(cmd, sizeof(cmd),
         "clang --target=wasm32-unknown-unknown -nostdlib "
         "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export-dynamic "
-        "%s \"%s\" -o \"%s\"",
+        "-D_CRT_SECURE_NO_WARNINGS -w %s \"%s\" -o \"%s\"",
         prod ? "-O2" : "-O1", wasm_c, wasm_path);
     if (run_cmd(cmd) == 0) printf("  .wasm   %s\n", wasm_path);
 
@@ -201,6 +201,9 @@ static void pipeline(
 // ── Entry point ──────────────────────────────────────────────────
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    SetConsoleOutputCP(65001);  // UTF-8
+#endif
     if (argc < 2) {
         fprintf(stderr, "uso: flowc <file.flow> [--run] [--prod]\n");
         return 1;
