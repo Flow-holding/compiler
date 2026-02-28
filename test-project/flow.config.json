@@ -1,9 +1,0 @@
-{
-    "name": "test-project",
-    "version": "0.1.0",
-    "entry": "src/main.flow",
-    "target": [
-        "web"
-    ],
-    "out": "out"
-}
