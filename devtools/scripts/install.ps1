@@ -11,20 +11,34 @@ New-Item -ItemType Directory -Force -Path $BIN_DIR | Out-Null
 $api     = "https://api.github.com/repos/$REPO/releases/latest"
 $release = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "flow-installer" }
 
-function Install-Binary($assetName, $destName) {
-    $asset = $release.assets | Where-Object { $_.name -eq $assetName }
-    if (-not $asset) {
-        Write-Host "Errore: $assetName non trovato nella release" -ForegroundColor Red
-        exit 1
-    }
-    $dest = "$BIN_DIR\$destName"
-    Write-Host "Download $assetName..."
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $dest
-    Unblock-File -Path $dest
+function Get-Asset($name) {
+    $asset = $release.assets | Where-Object { $_.name -eq $name }
+    if (-not $asset) { Write-Host "Errore: $name non trovato nella release" -ForegroundColor Red; exit 1 }
+    return $asset.browser_download_url
 }
 
-Install-Binary "flow-windows-x64.exe"  "flow.exe"
-Install-Binary "flowc-windows-x64.exe" "flowc.exe"
+# Scarica flow.exe e flowc.exe
+Write-Host "Download flow.exe..."
+Invoke-WebRequest -Uri (Get-Asset "flow-windows-x64.exe")  -OutFile "$BIN_DIR\flow.exe"
+Invoke-WebRequest -Uri (Get-Asset "flowc-windows-x64.exe") -OutFile "$BIN_DIR\flowc.exe"
+Unblock-File "$BIN_DIR\flow.exe"
+Unblock-File "$BIN_DIR\flowc.exe"
+
+# Installa estensione editor (Cursor e VSCode)
+Write-Host "Installazione estensione editor..."
+$zipUrl  = Get-Asset "flow-vscode.zip"
+$zipTmp  = "$env:TEMP\flow-vscode.zip"
+Invoke-WebRequest -Uri $zipUrl -OutFile $zipTmp
+
+foreach ($editor in @(".cursor", ".vscode")) {
+    $extDir = "$env:USERPROFILE\$editor\extensions\flow-language"
+    if (Test-Path "$env:USERPROFILE\$editor") {
+        if (Test-Path $extDir) { Remove-Item -Recurse -Force $extDir }
+        Expand-Archive -Path $zipTmp -DestinationPath $extDir -Force
+        Write-Host "  OK $extDir" -ForegroundColor Green
+    }
+}
+Remove-Item $zipTmp
 
 # Aggiunge al PATH utente
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
@@ -34,5 +48,6 @@ if ($userPath -notlike "*$BIN_DIR*") {
 }
 
 Write-Host ""
-Write-Host "flow installato ($($release.tag_name))!" -ForegroundColor Green
+Write-Host "flow $($release.tag_name) installato!" -ForegroundColor Green
 Write-Host "  Riapri il terminale e scrivi: flow help"
+Write-Host "  Riavvia Cursor/VSCode per la syntax highlighting"

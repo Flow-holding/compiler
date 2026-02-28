@@ -12,7 +12,11 @@
                 "id": "flow",
                 "aliases": ["Flow", "flow"],
                 "extensions": [".flow"],
-                "configuration": "./language-configuration.json"
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./icons/flow-file.svg",
+                    "dark":  "./icons/flow-file.svg"
+                }
             }
         ],
         "grammars": [
