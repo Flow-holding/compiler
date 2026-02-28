@@ -1,0 +1,22 @@
+@native("flow_map_new")
+fn map<K, V>(): {K: V}
+
+@native("flow_map_set")
+fn set<K, V>(m: {K: V}, key: K, val: V)
+
+@native("flow_map_get")
+fn get<K, V>(m: {K: V}, key: K): ?V
+
+@native("flow_map_has")
+fn has<K, V>(m: {K: V}, key: K): bool
+
+@native("flow_map_len")
+fn len<K, V>(m: {K: V}): int
+
+// Metodi — disponibili su ogni mappa
+// m.set("key", val)    →  inserisce o aggiorna
+// m.get("key")         →  ?V — valore o null
+// m.has("key")         →  bool
+// m.len                →  numero di chiavi
+// m.keys               →  str[] — tutte le chiavi
+// m.values             →  V[]  — tutti i valori

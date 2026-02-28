@@ -1,0 +1,25 @@
+@native("flow_str_concat")
+fn concat(a: str, b: str): str
+
+@native("flow_str_eq")
+fn eq(a: str, b: str): bool
+
+@native("flow_str_len")
+fn len(s: str): int
+
+// Metodi — disponibili su ogni str
+// s.len                  →  int
+// s.upper                →  str
+// s.lower                →  str
+// s.trim                 →  str
+// s.split(",")           →  str[]
+// s.contains("ciao")     →  bool
+// s.starts("http")       →  bool
+// s.ends(".flow")        →  bool
+// s.replace("a", "b")    →  str
+// s.slice(0, 5)          →  str
+
+// Operatori — il compiler li mappa automaticamente
+// "a" + "b"   →  concat
+// a == b      →  eq
+// "Ciao {nome}" → interpolazione con { }

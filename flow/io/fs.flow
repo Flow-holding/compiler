@@ -1,0 +1,17 @@
+@native("flow_fs_read")
+fn read(path: str): ?str
+
+@native("flow_fs_write")
+fn write(path: str, contenuto: str): bool
+
+@native("flow_fs_exists")
+fn exists(path: str): bool
+
+@native("flow_fs_delete")
+fn delete(path: str): bool
+
+// Uso:
+// fs.read("config.json")
+// fs.write("output.txt", testo)
+// fs.exists("file.flow")
+// fs.delete("temp.txt")

@@ -1,0 +1,21 @@
+@native("flow_array_new")
+fn arr<T>(): T[]
+
+@native("flow_array_push")
+fn push<T>(a: T[], item: T): T[]
+
+@native("flow_array_get")
+fn get<T>(a: T[], i: int): T
+
+@native("flow_array_len")
+fn len<T>(a: T[]): int
+
+// Metodi — disponibili su ogni array
+// lista.push(x)        →  aggiunge x in fondo
+// lista.get(0)         →  primo elemento
+// lista.len            →  numero elementi
+// lista.map((x) { })   →  trasforma ogni elemento
+// lista.filter((x) { })→  filtra elementi
+// lista.first          →  ?T — primo o null
+// lista.last           →  ?T — ultimo o null
+// lista.has(x)         →  bool

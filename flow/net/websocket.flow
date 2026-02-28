@@ -1,0 +1,13 @@
+WebSocket = {
+    connesso: bool
+}
+
+@native("flow_ws_send")
+fn send(ws: WebSocket, msg: str): bool
+
+@native("flow_ws_close")
+fn close(ws: WebSocket)
+
+// Uso:
+// ws.send(connessione, "ciao")
+// ws.close(connessione)

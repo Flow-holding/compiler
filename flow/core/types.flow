@@ -1,0 +1,33 @@
+// ── Primitivi ──────────────────────────────
+str          // "ciao mondo"
+int          // 42
+float        // 3.14
+bool         // true / false
+void         // nessun valore di ritorno
+any          // tipo dinamico — usare solo se necessario
+
+// ── Collezioni ─────────────────────────────
+str[]        // array →  ["a", "b", "c"]
+{str: int}   // mappa →  { "mario": 25 }
+
+// ── Opzionale ──────────────────────────────
+?str         // str oppure null
+             // accesso sicuro:  utente?.email
+             // fallback:        utente?.email ?? "nessuna"
+
+// ── Risultato / Errore ──────────────────────
+str | err    // ritorna str oppure errore
+             // uso: match risultato { ok(v) { } err(e) { } }
+
+// ── Funzioni come tipo ──────────────────────
+fn(str)           // funzione che prende str, non ritorna niente
+fn(str): int      // funzione che prende str, ritorna int
+fn(int, int): int // funzione con due parametri
+
+// ── Struct custom ───────────────────────────
+// Si definiscono con = { } — vedi esempi:
+// Utente = { nome: str, età: int, email: ?str }
+
+// ── Casting ─────────────────────────────────
+// x as int     // converti x a int
+// x as str     // converti x a str

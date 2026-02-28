@@ -1,0 +1,14 @@
+@native("flow_print")
+fn print(s: str)
+
+@native("flow_print_int")
+fn print(n: int)
+
+@native("flow_print_float")
+fn print(n: float)
+
+@native("flow_print_bool")
+fn print(b: bool)
+
+@native("flow_eprint")
+fn eprint(s: str)

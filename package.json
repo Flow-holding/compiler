@@ -4,8 +4,7 @@
     "description": "Flow language compiler",
     "scripts": {
         "dev":   "bun run src/main.ts",
-        "build": "bun build src/main.ts --compile --outfile flowc",
-        "test":  "powershell -File test.ps1"
+        "build": "bun build src/main.ts --compile --outfile flowc"
        
     }
 }
