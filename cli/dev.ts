@@ -64,9 +64,12 @@ export async function cmdDev() {
             const glob = new Bun.Glob("**/*.flow")
             let changed = false
             for await (const file of glob.scan(srcDir2)) {
-                const full = join(srcDir2, file)
-                const stat = await Bun.file(full).stat?.()
-                const mod  = stat?.mtime ?? 0
+                const full  = join(srcDir2, file)
+                const stat  = await Bun.file(full).stat?.()
+                // Converti mtime in numero (ms) per confronto stabile
+                const mod   = stat?.mtime instanceof Date
+                    ? stat.mtime.getTime()
+                    : Number(stat?.mtime ?? 0)
                 if (mod !== (lastMods[full] ?? 0)) {
                     lastMods[full] = mod
                     changed = true
