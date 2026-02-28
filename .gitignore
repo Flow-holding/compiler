@@ -1,0 +1,12 @@
+# Binari compilati
+*.exe
+*.o
+*.out
+flowc
+
+# Output build
+dist/
+build/
+
+# Node
+node_modules/

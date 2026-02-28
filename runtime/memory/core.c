@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -39,21 +40,3 @@ void flow_release(FlowObject* obj) {
     }
 }
 
-// ─────────────────────────────────────────
-// Test — da rimuovere dopo
-// ─────────────────────────────────────────
-int main() {
-    FlowObject* obj = flow_alloc(64);
-    printf("ref_count dopo alloc:   %d\n", obj->ref_count); // 1
-
-    flow_retain(obj);
-    printf("ref_count dopo retain:  %d\n", obj->ref_count); // 2
-
-    flow_release(obj);
-    printf("ref_count dopo release: %d\n", obj->ref_count); // 1
-
-    flow_release(obj); // ref = 0 → free automatico
-    printf("memoria liberata correttamente\n");
-
-    return 0;
-}
