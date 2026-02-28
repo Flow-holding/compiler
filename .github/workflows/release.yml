@@ -101,7 +101,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.flow_out }}
+          name: build-${{ matrix.flow_out }}
           path: dist/
 
   release:
