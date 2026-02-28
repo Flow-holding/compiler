@@ -1,56 +1,45 @@
-// Runtime embedded — i file C del runtime sono inclusi come stringhe
-// Bun li risolve staticamente al momento del build --compile
+// Runtime embed — usa il bundle pre-generato (compiler/runtime-bundle.ts)
+// I file C sono inclusi come stringhe nel binario compilato
 
-import { join } from "node:path"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { join }                          from "node:path"
+import { existsSync, mkdirSync,
+         writeFileSync, readFileSync }   from "node:fs"
+import { RUNTIME_BUNDLE }               from "./runtime-bundle"
 
-// Bun include questi file nel binario compilato tramite import statico
-// I path sono relativi a questo file e vengono risolti a compile-time
-const RUNTIME_FILES: Record<string, string> = {
-    "memory/core.c":   await Bun.file(new URL("../runtime/memory/core.c",   import.meta.url)).text().catch(() => ""),
-    "types/strings.c": await Bun.file(new URL("../runtime/types/strings.c", import.meta.url)).text().catch(() => ""),
-    "types/arrays.c":  await Bun.file(new URL("../runtime/types/arrays.c",  import.meta.url)).text().catch(() => ""),
-    "types/maps.c":    await Bun.file(new URL("../runtime/types/maps.c",    import.meta.url)).text().catch(() => ""),
-    "io/print.c":      await Bun.file(new URL("../runtime/io/print.c",      import.meta.url)).text().catch(() => ""),
-    "io/fs.c":         await Bun.file(new URL("../runtime/io/fs.c",         import.meta.url)).text().catch(() => ""),
-    "io/dom.c":        await Bun.file(new URL("../runtime/io/dom.c",        import.meta.url)).text().catch(() => ""),
-    "net/http.c":      await Bun.file(new URL("../runtime/net/http.c",      import.meta.url)).text().catch(() => ""),
-    "net/websocket.c": await Bun.file(new URL("../runtime/net/websocket.c", import.meta.url)).text().catch(() => ""),
-    "wasm/stdlib.c":   await Bun.file(new URL("../runtime/wasm/stdlib.c",   import.meta.url)).text().catch(() => ""),
-    "wasm/runtime.c":  await Bun.file(new URL("../runtime/wasm/runtime.c",  import.meta.url)).text().catch(() => ""),
-}
+const FLOW_HOME      = join(process.env.USERPROFILE ?? process.env.HOME ?? ".", ".flow")
+const RUNTIME_CACHE  = join(FLOW_HOME, "runtime")
+const STAMP_FILE     = join(RUNTIME_CACHE, ".version")
 
-// Cartella dove vengono estratti i file C — ~/.flow/runtime/
-const FLOW_HOME = join(process.env.USERPROFILE ?? process.env.HOME ?? ".", ".flow")
-const RUNTIME_CACHE = join(FLOW_HOME, "runtime")
-
-// Estrae i file runtime nella home dell'utente
+// Estrae i file C nella home dell'utente (~/.flow/runtime/)
 async function extractRuntime(): Promise<string> {
-    const stamp = join(RUNTIME_CACHE, ".version")
+    if (existsSync(STAMP_FILE)) return RUNTIME_CACHE  // già estratti
 
-    // Se già estratti e aggiornati, non fare niente
-    if (existsSync(stamp)) return RUNTIME_CACHE
-
-    mkdirSync(join(RUNTIME_CACHE, "memory"), { recursive: true })
-    mkdirSync(join(RUNTIME_CACHE, "types"),  { recursive: true })
-    mkdirSync(join(RUNTIME_CACHE, "io"),     { recursive: true })
-    mkdirSync(join(RUNTIME_CACHE, "net"),    { recursive: true })
-    mkdirSync(join(RUNTIME_CACHE, "wasm"),   { recursive: true })
-
-    for (const [relPath, content] of Object.entries(RUNTIME_FILES)) {
-        if (content) writeFileSync(join(RUNTIME_CACHE, relPath), content)
+    for (const [relPath, content] of Object.entries(RUNTIME_BUNDLE)) {
+        const dest = join(RUNTIME_CACHE, relPath)
+        mkdirSync(join(dest, ".."), { recursive: true })
+        writeFileSync(dest, content)
     }
 
-    writeFileSync(stamp, "1")
+    writeFileSync(STAMP_FILE, "1")
     return RUNTIME_CACHE
 }
 
-// Ritorna il path al runtime — locale in dev, estratto in produzione
-export async function getRuntimeDir(): Promise<string> {
-    // In sviluppo la cartella runtime è accanto al sorgente
-    const devPath = join(new URL("../runtime", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"))
-    if (existsSync(devPath)) return devPath
+// Forza la ri-estrazione (usato da flow update)
+export async function reExtractRuntime(): Promise<string> {
+    try { require("node:fs").rmSync(STAMP_FILE) } catch {}
+    return await extractRuntime()
+}
 
-    // In produzione (binario compilato) — estrai i file embedded
+// Ritorna il path al runtime corretto
+// - In sviluppo: usa la cartella /runtime/ locale
+// - In produzione (binario): estrae in ~/.flow/runtime/
+export async function getRuntimeDir(): Promise<string> {
+    // Sviluppo locale — la cartella runtime è accanto al compiler
+    const devPath = join(import.meta.dir, "../runtime")
+    if (existsSync(devPath) && existsSync(join(devPath, "io/print.c"))) {
+        return devPath
+    }
+
+    // Produzione — estrai il bundle embedded
     return await extractRuntime()
 }

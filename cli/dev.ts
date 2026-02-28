@@ -51,23 +51,35 @@ export async function cmdDev() {
 
     console.log(`✓ Server avviato su http://localhost:${server.port}\n`)
 
-    // Watcher — ricompila quando cambiano i file .flow
-    const watcher = Bun.file(entry)
-    let   lastMod = (await watcher.stat?.()).mtime ?? 0
+    // Watcher — guarda solo i file .flow nella cartella src/
+    const srcDir2 = join(process.cwd(), "src")
+    console.log(`  watching ${srcDir2}\n`)
 
-    console.log(`  watching ${entry}\n`)
+    let rebuilding = false
+    let lastMods: Record<string, number> = {}
 
     setInterval(async () => {
+        if (rebuilding) return
         try {
-            const stat = await Bun.file(entry).stat?.()
-            const mod  = stat?.mtime ?? 0
-            if (mod !== lastMod) {
-                lastMod = mod
+            const glob = new Bun.Glob("**/*.flow")
+            let changed = false
+            for await (const file of glob.scan(srcDir2)) {
+                const full = join(srcDir2, file)
+                const stat = await Bun.file(full).stat?.()
+                const mod  = stat?.mtime ?? 0
+                if (mod !== (lastMods[full] ?? 0)) {
+                    lastMods[full] = mod
+                    changed = true
+                }
+            }
+            if (changed) {
+                rebuilding = true
                 process.stdout.write("  rebuild... ")
                 const t = Date.now()
                 await build({ run: false })
                 console.log(`  ✓ rebuild in ${Date.now() - t}ms`)
+                rebuilding = false
             }
-        } catch {}
-    }, 300)
+        } catch { rebuilding = false }
+    }, 400)
 }
