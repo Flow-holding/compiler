@@ -1,0 +1,31 @@
+// router — flow-os
+// Routing nativo multi-target (web SPA, mobile, desktop)
+
+@native("flow_router_get")
+fn get(path: str, handler: fn(ctx: RouteCtx))
+
+@native("flow_router_post")
+fn post(path: str, handler: fn(ctx: RouteCtx))
+
+@native("flow_router_push")
+fn push(path: str)
+
+@native("flow_router_replace")
+fn replace(path: str)
+
+@native("flow_router_back")
+fn back()
+
+@native("flow_router_current")
+fn current(): RouteCtx
+
+type RouteCtx {
+    path:   str
+    params: map<str, str>
+    query:  map<str, str>
+}
+
+// Uso:
+//   router.push("/home")
+//   router.get("/user/:id", fn(ctx) { print(ctx.params["id"]) })
+//   let page = router.current()

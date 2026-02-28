@@ -1,0 +1,31 @@
+// {{name}}
+
+fn main() {
+    print("Ciao da {{name}}")
+}
+
+@client
+component App() {
+    let count = state.use(0)
+
+    return Column {
+        style: style({ padding: 24, gap: 16 })
+
+        Text {
+            value: "Benvenuto in {{name}}"
+            style: style({ size: 28, weight: "bold", color: "#111" })
+        }
+
+        Button {
+            text: "Conta: {count}"
+            onPress: fn() { count += 1 }
+            style: style({
+                bg:     "#3b82f6"
+                color:  "#fff"
+                radius: 8
+                padding: 12
+                hover:  { bg: "#2563eb" }
+            })
+        }
+    }
+}

@@ -16,42 +16,67 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            target: bun-windows-x64
             outfile: flow-windows-x64.exe
+            lflags:  "-lws2_32"
             display: Windows x64
+
           - os: ubuntu-latest
-            target: bun-linux-x64
             outfile: flow-linux-x64
+            lflags:  "-lpthread"
             display: Linux x64
+
+          - os: ubuntu-latest
+            outfile: flow-linux-arm64
+            lflags:  "-lpthread"
+            cc:      "aarch64-linux-gnu-gcc"
+            display: Linux arm64
+
           - os: macos-latest
-            target: bun-darwin-x64
             outfile: flow-macos-x64
+            lflags:  ""
             display: macOS x64
+
           - os: macos-latest
-            target: bun-darwin-arm64
             outfile: flow-macos-arm64
+            lflags:  ""
+            cc_flags: "-arch arm64"
             display: macOS arm64
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+      - name: Install cross-compiler (Linux arm64)
+        if: matrix.outfile == 'flow-linux-arm64'
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Install deps
-        working-directory: devtools
-        run: bun install
+      - name: Build CLI
+        working-directory: cli
+        shell: bash
+        run: |
+          CC="${{ matrix.cc || 'clang' }}"
+          SRC="main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c"
+          OUT="../dist/${{ matrix.outfile }}"
+          mkdir -p ../dist
+          $CC -O2 -DNDEBUG ${{ matrix.cc_flags }} $SRC -o "$OUT" ${{ matrix.lflags }}
+          echo "✓ Built ${{ matrix.outfile }}"
 
-      - name: Build
-        working-directory: devtools
-        run: bun run scripts/bundle-runtime.ts && bun run scripts/bundle-compiler.ts && bun build ../cli/main.ts --compile --target ${{ matrix.target }} --outfile ../dist/${{ matrix.outfile }}
+      - name: Build flowc
+        working-directory: compiler
+        shell: bash
+        run: |
+          CC="${{ matrix.cc || 'clang' }}"
+          EXT="${{ endsWith(matrix.outfile, '.exe') && '.exe' || '' }}"
+          PLATFORM="${{ startsWith(matrix.outfile, 'flow-windows') && 'windows' || startsWith(matrix.outfile, 'flow-macos') && 'macos' || 'linux' }}"
+          ARCH="${{ endsWith(matrix.outfile, 'arm64') || endsWith(matrix.outfile, 'arm64.exe') && 'arm64' || 'x64' }}"
+          OUT="../dist/flowc-${PLATFORM}-${ARCH}${EXT}"
+          $CC -O2 ${{ matrix.cc_flags }} main.c lexer/lexer.c parser/parser.c codegen/codegen.c -o "$OUT"
+          echo "✓ Built flowc-${PLATFORM}-${ARCH}${EXT}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.outfile }}
-          path: dist/${{ matrix.outfile }}
+          path: dist/
 
   release:
     name: Publish Release
@@ -70,6 +95,7 @@ jobs:
         run: |
           find dist -mindepth 2 -type f -exec mv {} dist/ \;
           find dist -type d -empty -delete
+          chmod +x dist/flow-linux-* dist/flow-macos-* dist/flowc-linux-* dist/flowc-macos-* 2>/dev/null || true
 
       - name: Estrai versione
         id: version
@@ -102,7 +128,13 @@ jobs:
           files: |
             dist/flow-windows-x64.exe
             dist/flow-linux-x64
+            dist/flow-linux-arm64
             dist/flow-macos-x64
             dist/flow-macos-arm64
+            dist/flowc-windows-x64.exe
+            dist/flowc-linux-x64
+            dist/flowc-linux-arm64
+            dist/flowc-macos-x64
+            dist/flowc-macos-arm64
             devtools/scripts/install.ps1
             devtools/scripts/install.sh

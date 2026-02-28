@@ -1,0 +1,20 @@
+// state — flow-os
+// Stato reattivo nativo — disponibile senza import
+
+@native("flow_state_use")
+fn use<T>(initial: T): T
+
+@native("flow_state_persistent")
+fn persistent<T>(key: str, initial: T): T
+
+@native("flow_state_computed")
+fn computed<T>(deps: any[], compute: fn() -> T): T
+
+@native("flow_state_effect")
+fn effect(deps: any[], run: fn())
+
+// Uso:
+//   let count = state.use(0)
+//   let saved = state.persistent("score", 0)
+//   let double = state.computed([count], fn() { count * 2 })
+//   state.effect([count], fn() { print(count) })

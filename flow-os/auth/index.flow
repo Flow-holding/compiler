@@ -1,0 +1,36 @@
+// auth — flow-os
+// Autenticazione nativa
+
+@native("flow_auth_login")
+fn login(email: str, password: str): AuthResult
+
+@native("flow_auth_logout")
+fn logout()
+
+@native("flow_auth_user")
+fn user(): ?User
+
+@native("flow_auth_require")
+fn require(role?: str)
+
+@native("flow_auth_token")
+fn token(): ?str
+
+type User {
+    id:    str
+    email: str
+    name:  str
+    role:  str
+}
+
+type AuthResult {
+    ok:    bool
+    user?: User
+    error?: str
+}
+
+// Uso:
+//   let result = auth.login("user@mail.com", "password")
+//   let me = auth.user()
+//   auth.require("admin")   ← redirect se non autorizzato
+//   auth.logout()
