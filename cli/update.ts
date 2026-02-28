@@ -4,8 +4,10 @@ import { join }                     from "node:path"
 import { existsSync, readFileSync,
          writeFileSync }            from "node:fs"
 
-const RELEASES_URL = "https://api.github.com/repos/Flow-holding/compiler/releases/latest"
-const VERSION_URL  = "https://raw.githubusercontent.com/Flow-holding/compiler/main/VERSION"
+const REPO         = "Flow-holding/compiler"
+const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`
+const VERSION_URL  = `https://raw.githubusercontent.com/${REPO}/main/VERSION`
+const DOWNLOAD_URL = `https://github.com/${REPO}/releases/download`
 
 // Versione corrente (aggiornata dal build script)
 export const CURRENT_VERSION = "0.1.0"
@@ -96,6 +98,7 @@ export async function update() {
         // Fallback: legge VERSION direttamente
         try {
             const res = await fetch(VERSION_URL, { headers: { "User-Agent": "flow-cli" } })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             latestVersion = (await res.text()).trim()
         } catch {
             console.log(" \x1b[31mErrore: impossibile raggiungere il server\x1b[0m")
@@ -115,7 +118,7 @@ export async function update() {
     const arch      = process.arch === "arm64" ? "arm64" : "x64"
     const ext       = isWindows ? ".exe" : ""
     const assetName = `flow-${platform}-${arch}${ext}`
-    const downloadURL = `https://github.com/flow-lang/flow/releases/download/v${latestVersion}/${assetName}`
+    const downloadURL = `${DOWNLOAD_URL}/v${latestVersion}/${assetName}`
 
     console.log(`Download \x1b[36m${assetName}\x1b[0m...`)
 
