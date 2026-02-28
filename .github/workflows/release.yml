@@ -1,6 +1,5 @@
 name: Release
 
-# Scatta automaticamente quando fai:  git tag v0.2.0 && git push --tags
 on:
   push:
     tags:
@@ -11,28 +10,71 @@ permissions:
 
 jobs:
   build:
-    name: Build & Release
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.display }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: bun-windows-x64
+            outfile: flow-windows-x64.exe
+            display: Windows x64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            outfile: flow-linux-x64
+            display: Linux x64
+          - os: macos-latest
+            target: bun-darwin-x64
+            outfile: flow-macos-x64
+            display: macOS x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            outfile: flow-macos-arm64
+            display: macOS arm64
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install deps
         run: bun install
 
-      - name: Estrai versione dal tag
+      - name: Build
+        run: bun build cli/main.ts --compile --target ${{ matrix.target }} --outfile dist/${{ matrix.outfile }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.outfile }}
+          path: dist/${{ matrix.outfile }}
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten artifact folders
+        run: |
+          find dist -type f | while read f; do
+            mv "$f" "dist/$(basename $f)"
+          done
+
+      - name: Estrai versione
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Build tutti i binari
-        run: bun run scripts/release.ts ${{ steps.version.outputs.VERSION }}
-
-      - name: Crea GitHub Release con tutti i binari
+      - name: Crea Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -40,7 +82,7 @@ jobs:
           body: |
             ## Flow v${{ steps.version.outputs.VERSION }}
 
-            ### Installazione rapida
+            ### Installazione
 
             **Windows** (PowerShell):
             ```powershell
@@ -59,7 +101,6 @@ jobs:
           files: |
             dist/flow-windows-x64.exe
             dist/flow-linux-x64
-            dist/flow-linux-arm64
             dist/flow-macos-x64
             dist/flow-macos-arm64
             scripts/install.ps1
