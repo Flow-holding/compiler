@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <stdint.h>
+#include <time.h>
 
 /* ── Sockets cross-platform ─────────────────────────────────────────────── */
 
@@ -277,7 +279,7 @@ int cmd_dev(void) {
             clock_gettime(CLOCK_MONOTONIC, &ts);
             long long ms = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL - t0;
 #endif
-            printf(C_GREEN "✓" C_RESET " rebuild in %llums\n", ms);
+            printf(C_GREEN "✓" C_RESET " rebuild in %lldms\n", ms);
         }
     }
 
