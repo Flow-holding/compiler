@@ -4,7 +4,7 @@
 import { join }                      from "node:path"
 import { existsSync, mkdirSync,
          writeFileSync }             from "node:fs"
-import { COMPILER_BUNDLE }          from "../compiler-ts-unused/compiler-bundle"
+import { COMPILER_BUNDLE }          from "../devtools/compiler-ts-unused/compiler-bundle"
 
 const FLOW_HOME     = join(process.env.USERPROFILE ?? process.env.HOME ?? ".", ".flow")
 const COMPILER_DIR  = join(FLOW_HOME, "compiler")

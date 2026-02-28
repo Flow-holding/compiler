@@ -45,7 +45,7 @@ jobs:
 
       - name: Build
         working-directory: devtools
-        run: bun run scripts/bundle-runtime.ts && bun build ../cli/main.ts --compile --target ${{ matrix.target }} --outfile ../dist/${{ matrix.outfile }}
+        run: bun run scripts/bundle-runtime.ts && bun run scripts/bundle-compiler.ts && bun build ../cli/main.ts --compile --target ${{ matrix.target }} --outfile ../dist/${{ matrix.outfile }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
