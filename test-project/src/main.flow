@@ -1,0 +1,26 @@
+// test-project
+
+fn main() {
+    print("Ciao da test-project")
+}
+
+@client
+component App() {
+    return Column {
+        style: { padding: 24, gap: 16 }
+        Text {
+            value: "Benvenuto in test-project"
+            style: { size: 28, weight: "bold", color: "#111" }
+        }
+        Button {
+            text: "Inizia"
+            style: {
+                bg: "#3b82f6"
+                color: "#fff"
+                radius: 8
+                padding: 12
+                hover: { bg: "#2563eb" }
+            }
+        }
+    }
+}

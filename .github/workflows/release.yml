@@ -1,0 +1,63 @@
+name: Release
+
+# Scatta automaticamente quando fai:  git tag v0.2.0 && git push --tags
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install
+
+      - name: Estrai versione dal tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build tutti i binari
+        run: bun run scripts/release.ts ${{ steps.version.outputs.VERSION }}
+
+      - name: Crea GitHub Release con tutti i binari
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "flow v${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## Flow v${{ steps.version.outputs.VERSION }}
+
+            ### Installazione rapida
+
+            **Windows** (PowerShell):
+            ```powershell
+            irm https://github.com/${{ github.repository }}/releases/latest/download/install.ps1 | iex
+            ```
+
+            **macOS / Linux**:
+            ```bash
+            curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh | sh
+            ```
+
+            ### Aggiornamento da versione precedente:
+            ```
+            flow update
+            ```
+          files: |
+            dist/flow-windows-x64.exe
+            dist/flow-linux-x64
+            dist/flow-linux-arm64
+            dist/flow-macos-x64
+            dist/flow-macos-arm64
+            scripts/install.ps1
+            scripts/install.sh
