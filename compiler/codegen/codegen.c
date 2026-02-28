@@ -436,6 +436,8 @@ Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime
 
 // ── HTML Generator ───────────────────────────────────────────────
 
+static int html_compact = 1;  // minify: no indent/newlines
+
 static void gen_ui_node(Str* html, Node* n, int ind) {
     if (!n || n->kind != ND_UI_NODE) return;
 
@@ -447,51 +449,46 @@ static void gen_ui_node(Str* html, Node* n, int ind) {
     else if (str_eq(n->name, "Row"))    tag = "div";
     else if (str_eq(n->name, "Column")) tag = "div";
 
-    for (int i = 0; i < ind; i++) str_cat(html, "  ");
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
     str_catf(html, "<%s", tag);
 
-    // Attributi/props
     for (int i = 0; i < n->style.len; i++) {
         Field* f = (Field*)n->style.data[i];
-        if (str_eq(f->name, "text") && f->value) {
-            // testo — va nel body, non come attributo
-        } else if (str_eq(f->name, "src") && f->value) {
+        if (str_eq(f->name, "text") && f->value) continue;
+        if (str_eq(f->name, "src") && f->value)
             str_catf(html, " src=\"%s\"", f->value->value ? f->value->value : "");
-        } else if (str_eq(f->name, "placeholder") && f->value) {
+        else if (str_eq(f->name, "placeholder") && f->value)
             str_catf(html, " placeholder=\"%s\"", f->value->value ? f->value->value : "");
-        }
     }
-    str_cat(html, ">\n");
+    str_cat(html, html_compact ? ">" : ">\n");
 
-    // Testo interno (text per Button, value per Text)
     for (int i = 0; i < n->style.len; i++) {
         Field* f = (Field*)n->style.data[i];
         if ((str_eq(f->name, "text") || str_eq(f->name, "value")) && f->value && f->value->value) {
-            for (int j = 0; j < ind + 1; j++) str_cat(html, "  ");
-            str_catf(html, "%s\n", f->value->value);
+            if (!html_compact) { for (int j = 0; j < ind + 1; j++) str_cat(html, "  "); }
+            str_catf(html, "%s%s", f->value->value, html_compact ? "" : "\n");
         }
     }
 
-    // Figli
     for (int i = 0; i < n->children.len; i++)
         gen_ui_node(html, (Node*)n->children.data[i], ind + 1);
 
-    for (int i = 0; i < ind; i++) str_cat(html, "  ");
-    str_catf(html, "</%s>\n", tag);
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_catf(html, "</%s>%s", tag, html_compact ? "" : "\n");
 }
 
 Str codegen_html(Arena* a, Node* program) {
     Str out = str_new();
     Str css = codegen_css(a, program);
     str_cat(&out,
-        "<!DOCTYPE html>\n<html lang=\"it\">\n<head>\n"
-        "  <meta charset=\"UTF-8\">\n"
-        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-        "  <title>Flow App</title>\n"
-        "  <style>");
+        "<!DOCTYPE html><html lang=\"it\"><head>"
+        "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Flow App</title>"
+        "<link rel=\"preload\" href=\"app.wasm\" as=\"fetch\" crossorigin fetchpriority=\"high\">"
+        "<style>");
     str_cat(&out, css.data);
     str_cat(&out,
-        "</style>\n</head>\n<body>\n  <div id=\"root\">\n");
+        "</style></head><body><div id=\"root\">");
 
     for (int i = 0; i < program->children.len; i++) {
         Node* n = (Node*)program->children.data[i];
@@ -508,9 +505,7 @@ Str codegen_html(Arena* a, Node* program) {
     }
 
     str_cat(&out,
-        "  </div>\n"
-        "  <script defer src=\"app.js\"></script>\n"
-        "</body>\n</html>\n");
+        "</div><script async src=\"app.js\"></script></body></html>");
     return out;
 }
 
@@ -519,11 +514,10 @@ Str codegen_html(Arena* a, Node* program) {
 Str codegen_css(Arena* a, Node* program) {
     Str out = str_new();
     str_cat(&out,
-        "*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }\n"
-        "body { font-family: system-ui, sans-serif; background: #fff; }\n"
-        "#root { display: flex; flex-direction: column; min-height: 100vh; padding: 24px; gap: 16px; }\n"
-        "#root p { font-size: 28px; font-weight: bold; color: #111; }\n"
-        "#root button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 12px; cursor: pointer; }\n\n");
+        "*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#fff}"
+        "#root{display:flex;flex-direction:column;min-height:100vh;padding:24px;gap:16px}"
+        "#root p{font-size:28px;font-weight:bold;color:#111}"
+        "#root button{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:12px;cursor:pointer}");
     return out;
 }
 
@@ -532,33 +526,13 @@ Str codegen_css(Arena* a, Node* program) {
 Str codegen_js(Arena* a, Node* program) {
     Str out = str_new();
     str_cat(&out,
-        "let wasmMem;\n"
-        "const imports = {\n"
-        "  env: {\n"
-        "    flow_print_str: (ptr) => {\n"
-        "      const view = new Uint8Array(wasmMem.buffer);\n"
-        "      let end = ptr;\n"
-        "      while (view[end]) end++;\n"
-        "      console.log(new TextDecoder().decode(view.subarray(ptr, end)));\n"
-        "    },\n"
-        "    flow_eprint_str: (ptr) => {\n"
-        "      const view = new Uint8Array(wasmMem.buffer);\n"
-        "      let end = ptr;\n"
-        "      while (view[end]) end++;\n"
-        "      console.error(new TextDecoder().decode(view.subarray(ptr, end)));\n"
-        "    },\n"
-        "  }\n"
-        "};\n\n"
-        "function loadWasm() {\n"
-        "  WebAssembly.instantiateStreaming(fetch('app.wasm'), imports)\n"
-        "    .then(({ instance }) => {\n"
-        "      wasmMem = instance.exports.memory;\n"
-        "      window._flow = instance.exports;\n"
-        "      if (instance.exports.main) instance.exports.main();\n"
-        "    })\n"
-        "    .catch(err => console.error('WASM error:', err));\n"
-        "}\n"
-        "if (document.readyState === 'complete') loadWasm();\n"
-        "else window.addEventListener('load', loadWasm);\n");
+        "let wasmMem;const imports={env:{"
+        "flow_print_str:ptr=>{const v=new Uint8Array(wasmMem.buffer);let e=ptr;while(v[e])e++;console.log(new TextDecoder().decode(v.subarray(ptr,e)));},"
+        "flow_eprint_str:ptr=>{const v=new Uint8Array(wasmMem.buffer);let e=ptr;while(v[e])e++;console.error(new TextDecoder().decode(v.subarray(ptr,e)));}"
+        "}};"
+        "function loadWasm(){WebAssembly.instantiateStreaming(fetch('app.wasm'),imports)"
+        ".then(({instance})=>{wasmMem=instance.exports.memory;window._flow=instance.exports;if(instance.exports.main)instance.exports.main();})"
+        ".catch(e=>console.error('WASM error:',e));}"
+        "document.readyState==='loading'?document.addEventListener('DOMContentLoaded',loadWasm):loadWasm();");
     return out;
 }
