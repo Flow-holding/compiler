@@ -1,5 +1,6 @@
 import { Token, TokenType } from "../lexer/token"
 import * as AST from "./ast"
+import { BASE_PROPS, BREAKPOINTS, PSEUDO_KEYS, SPECIAL_KEYS } from "../style-map"
 
 export function parse(tokens: Token[]): AST.Program {
     let i = 0
@@ -275,6 +276,144 @@ export function parse(tokens: Token[]): AST.Program {
 
     // ── Top level ─────────────────────────────
 
+    // ── UI Components ─────────────────────────
+
+    const UI_TAGS = new Set([
+        "View","Column","Row","Stack","Grid","ScrollView",
+        "Text","Button","Input","Image","Modal"
+    ])
+
+    // Legge un nome di chiave — accetta IDENT e keyword usate come chiavi
+    function eatKey(): string {
+        const t = peek()
+        if (t.type === "IDENT" || t.type === "TYPE" || t.type === "IN" ||
+            t.type === "FN" || t.type === "FOR" || t.type === "IF") {
+            return next().value
+        }
+        return eat("IDENT").value
+    }
+
+    function parsePropValue(type: string): any {
+        switch (type) {
+            case "string": return eat("STRING").value
+            case "px":
+            case "number": return parseFloat((check("INT") ? eat("INT") : eat("FLOAT")).value)
+            case "bool":   { const v = peek().type === "TRUE"; next(); return v }
+            case "px-array": {
+                if (check("INT")) return parseInt(eat("INT").value)
+                eat("LBRACKET")
+                const vals: number[] = []
+                while (!check("RBRACKET") && !check("EOF")) { vals.push(parseInt(eat("INT").value)); if (check("COMMA")) next() }
+                eat("RBRACKET")
+                return vals
+            }
+        }
+        if (check("STRING") || check("INT") || check("FLOAT") || check("TRUE") || check("FALSE")) next()
+        return undefined
+    }
+
+    function skipValue() {
+        if (check("STRING") || check("INT") || check("FLOAT") || check("TRUE") || check("FALSE")) { next(); return }
+        if (check("LBRACE")) {
+            next(); let depth = 1
+            while (depth > 0 && !check("EOF")) { if (check("LBRACE")) depth++; else if (check("RBRACE")) depth--; next() }
+        }
+    }
+
+    function parseBaseStyle(): AST.BaseStyle {
+        eat("LBRACE")
+        const s: AST.BaseStyle = {}
+        while (!check("RBRACE") && !check("EOF")) {
+            const key = eatKey()
+            eat("COLON")
+            const def = BASE_PROPS[key]
+            if (def) {
+                (s as any)[key] = parsePropValue(def.type)
+            } else {
+                skipValue()
+            }
+            if (check("COMMA")) next()
+        }
+        eat("RBRACE")
+        return s
+    }
+
+    function parseAnimProps(): AST.AnimProps {
+        eat("LBRACE")
+        const a: AST.AnimProps = { type: "fadeIn" }
+        while (!check("RBRACE") && !check("EOF")) {
+            const key = eatKey()
+            eat("COLON")
+            switch (key) {
+                case "type":   a.type    = eat("STRING").value; break
+                case "easing": a.easing  = eat("STRING").value; break
+                case "repeat":
+                    if (check("STRING")) a.repeat = eat("STRING").value as any
+                    else a.repeat = parseInt(eat("INT").value); break
+                case "duration": case "delay":
+                    a[key] = parseInt(eat("INT").value); break
+                default: if (check("STRING") || check("INT")) next()
+            }
+            if (check("COMMA")) next()
+        }
+        eat("RBRACE")
+        return a
+    }
+
+    function parseStyleProps(): AST.StyleProps {
+        eat("LBRACE")
+        const style: AST.StyleProps = {}
+        while (!check("RBRACE") && !check("EOF")) {
+            const key = eatKey()
+            eat("COLON")
+
+            if (key === "base")  { style.base  = parseBaseStyle(); }
+            else if (key === "anim") { style.anim = parseAnimProps(); }
+            else if (key in BREAKPOINTS || PSEUDO_KEYS.has(key)) {
+                (style as any)[key] = parseBaseStyle()
+            } else {
+                // shorthand — proprietà CSS diretta
+                const def = BASE_PROPS[key]
+                if (def) (style as any)[key] = parsePropValue(def.type)
+                else skipValue()
+            }
+
+            if (check("COMMA")) next()
+        }
+        eat("RBRACE")
+        return style
+    }
+
+    function parseUINode(): AST.UINode {
+        const tag = eat("IDENT").value
+        eat("LBRACE")
+        const props: { key: string; value: AST.Node }[] = []
+        const children: AST.UINode[] = []
+        let style: AST.StyleProps | null = null
+
+        while (!check("RBRACE") && !check("EOF")) {
+            // IDENT seguito da { → figlio UINode diretto
+            if (check("IDENT") && UI_TAGS.has(peek().value) && tokens[i + 1]?.type === "LBRACE") {
+                children.push(parseUINode())
+                if (check("COMMA")) next()
+                continue
+            }
+
+            const key = eat("IDENT").value
+
+            if (key === "style") {
+                eat("COLON")
+                style = parseStyleProps()
+            } else {
+                eat("COLON")
+                props.push({ key, value: parseExpr() })
+            }
+            if (check("COMMA")) next()
+        }
+        eat("RBRACE")
+        return { kind: "UINode", tag, props, children, style }
+    }
+
     function parseAnnotation(): AST.Annotation {
         eat("AT")
         const name = eat("IDENT").value
@@ -292,6 +431,28 @@ export function parse(tokens: Token[]): AST.Program {
         let annotation: AST.Annotation | null = null
         if (check("AT")) {
             annotation = parseAnnotation()
+        }
+
+        // component
+        if (check("COMPONENT")) {
+            next()
+            const name = eat("IDENT").value
+            eat("LPAREN")
+            const params: AST.Param[] = []
+            while (!check("RPAREN") && !check("EOF")) {
+                const pname = eat("IDENT").value
+                eat("COLON")
+                const ptype = parseType()
+                params.push({ name: pname, type: ptype })
+                if (check("COMMA")) next()
+            }
+            eat("RPAREN")
+            eat("LBRACE")
+            // return UINode
+            if (check("RETURN")) next()
+            const body = parseUINode()
+            eat("RBRACE")
+            return { kind: "ComponentDecl", name, params, body, annotation }
         }
 
         // fn

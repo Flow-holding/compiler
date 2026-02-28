@@ -3,8 +3,11 @@
     "version": "0.1.0",
     "description": "Flow language compiler",
     "scripts": {
-        "dev":   "bun run src/main.ts",
-        "build": "bun build src/main.ts --compile --outfile flowc"
-       
+        "compile": "bun run compiler/main.ts",
+        "build": "bun build compiler/main.ts --compile --outfile flowc.exe",
+        "test": "powershell -File test.ps1"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.3.9"
     }
 }

@@ -1,0 +1,30 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { font-family: system-ui, sans-serif; }
+
+.fl-column-1 {
+  display: flex;
+  flex-direction: column;
+}
+
+.fl-text-2 {
+  font-size: 28px;
+  font-weight: bold;
+  color: #111;
+}
+
+.fl-button-3 {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+}
+
+.fl-button-3 {
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 8px;
+  padding: 12px;
+}

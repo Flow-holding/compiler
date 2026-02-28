@@ -1,6 +1,8 @@
 import * as AST from "../parser/ast"
 
-export function codegen(program: AST.Program): string {
+export type CodegenTarget = "native" | "wasm"
+
+export function codegen(program: AST.Program, target: CodegenTarget = "native"): string {
     const lines: string[] = []
     let indent = 0
 
@@ -268,12 +270,22 @@ export function codegen(program: AST.Program): string {
 
     // ── Header includes ───────────────────────────
 
-    emit('#include "../../runtime/io/print.c"')
-    emit('#include "../../runtime/io/fs.c"')
-    emit('#include "../../runtime/net/http.c"')
+    if (target === "wasm") {
+        emit('#include "../../runtime/wasm/runtime.c"')
+    } else {
+        emit('#include "../../runtime/io/print.c"')
+        emit('#include "../../runtime/io/fs.c"')
+        emit('#include "../../runtime/net/http.c"')
+    }
     emit("")
 
-    for (const node of program.body) genTopLevel(node)
+    for (const node of program.body) {
+        // WASM — aggiungi export attribute alle funzioni
+        if (target === "wasm" && node.kind === "FnDecl" && node.annotation?.name !== "native") {
+            emit(`__attribute__((export_name("${node.name}")))`)
+        }
+        genTopLevel(node)
+    }
 
     return lines.join("\n")
 }

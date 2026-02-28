@@ -5,6 +5,8 @@ export type Node =
     | FnDecl
     | VarDecl
     | StructDecl
+    | ComponentDecl
+    | UINode
     | Annotation
     | Block
     | IfStmt
@@ -172,6 +174,67 @@ export type MapLiteral = {
     kind: "MapLiteral"
     entries: { key: Node; value: Node }[]
 }
+
+// ── Componenti UI ───────────────────────────
+
+// @client component Home(props) { return Column { ... } }
+export type ComponentDecl = {
+    kind: "ComponentDecl"
+    name: string
+    params: Param[]
+    body: UINode
+    annotation: Annotation | null   // @client / @server
+}
+
+// Column { Text { value: "ciao" } Button { text: "ok" } }
+export type UINode = {
+    kind: "UINode"
+    tag: string                             // "Column", "Text", "Button" ...
+    props: { key: string; value: Node }[]   // value: "ciao", style: { ... }
+    children: UINode[]
+    style: StyleProps | null
+}
+
+export type BaseStyle = {
+    color?: string
+    bg?: string
+    size?: number
+    weight?: string
+    padding?: number | number[]
+    margin?: number | number[]
+    radius?: number
+    width?: string
+    height?: string
+    opacity?: number
+    shadow?: boolean
+    border?: string
+    display?: string
+    gap?: number
+    flex?: number
+    align?: string   // "center" | "start" | "end"
+    justify?: string // "center" | "between" | "end"
+    overflow?: string
+    cursor?: string
+    zIndex?: number
+}
+
+export type AnimProps = {
+    type: string        // "fadeIn" | "slideUp" | "bounce" | "spin" | nome custom
+    duration?: number   // ms
+    delay?: number      // ms
+    repeat?: number | "loop"
+    easing?: string     // "ease" | "linear" | "spring"
+}
+
+export type StyleProps = {
+    base?: BaseStyle    // stili base — tutti i breakpoint
+    mob?: BaseStyle     // mobile < 768px
+    tab?: BaseStyle     // tablet 768–1024px
+    desk?: BaseStyle    // desktop > 1024px
+    anim?: AnimProps    // animazione
+    hover?: BaseStyle   // on hover
+    // shorthand — se non usi base/mob/tab scrivi direttamente qui
+} & BaseStyle
 
 // ── Tipi ────────────────────────────────────
 
