@@ -115,77 +115,83 @@ int cmd_update(void) {
     }
     printf(" " C_GREEN "%s disponibile!\x1b[0m\n", version);
 
-    /* 3. Trova URL download per questa piattaforma */
-    char *asset_name = str_fmt("flow-%s-%s%s", PLATFORM, ARCH, ASSET_EXT);
-    char *dl_url     = find_asset_url(json, asset_name);
-    free(json);
+    /* 3. Scarica flow + flowc per questa piattaforma */
+    char *bin_dir = str_fmt("%s" SEP "bin", home);
+    mkdir_p(bin_dir);
 
-    if (!dl_url) {
-        fprintf(stderr, C_RED "✗" C_RESET " asset non trovato: %s\n", asset_name);
-        free(asset_name); free(version); free(home);
-        return 1;
-    }
-    printf("Download " C_CYAN "%s" C_RESET "...\n", asset_name);
-    free(asset_name);
-
-    /* 4. Scarica il nuovo binario */
-    char *tmpbin = str_fmt("%s" SEP "flow-new" ASSET_EXT, home);
-    if (curl_download(dl_url, tmpbin, "User-Agent: flow-cli") != 0) {
-        fprintf(stderr, C_RED "✗" C_RESET " download fallito: %s\n", dl_url);
-        free(dl_url); free(tmpbin); free(version); free(home);
-        return 1;
-    }
-    free(dl_url);
-
-    /* 5. Sostituisci il binario corrente */
     char exe[4096];
     if (get_exe_path(exe, sizeof(exe)) != 0) {
         fprintf(stderr, C_RED "✗" C_RESET " impossibile trovare il percorso del binario\n");
-        free(tmpbin); free(version); free(home);
+        free(bin_dir); free(json); free(version); free(home);
         return 1;
     }
+    char *exe_dir = path_dirname(exe);
+
+    /* Scarica un asset e installalo */
+    int errors = 0;
+    const char *tools[] = { "flow", "flowc", NULL };
+    for (int i = 0; tools[i]; i++) {
+        char *asset = str_fmt("%s-%s-%s%s", tools[i], PLATFORM, ARCH, ASSET_EXT);
+        char *url   = find_asset_url(json, asset);
+        if (!url) {
+            fprintf(stderr, C_YELLOW "⚠" C_RESET "  asset non trovato: %s\n", asset);
+            free(asset); errors++; continue;
+        }
+        printf("Download " C_CYAN "%s" C_RESET "...", asset);
+        fflush(stdout);
+
+        char *tmp = str_fmt("%s" SEP "%s-new%s", bin_dir, tools[i], ASSET_EXT);
+        if (curl_download(url, tmp, "User-Agent: flow-cli") != 0) {
+            printf(" " C_RED "✗" C_RESET "\n");
+            free(tmp); free(url); free(asset); errors++; continue;
+        }
 
 #ifdef _WIN32
-    /* Su Windows: muovi a .new e usa un .bat per la sostituzione */
-    char *exenew = str_fmt("%s.new", exe);
-    char *bat    = str_fmt("%s-update.bat", exe);
-
-    /* Rinomina tmpbin → exe.new */
-    const char *mv_argv[] = { "move", "/y", tmpbin, exenew, NULL };
-    run_cmd(mv_argv);
-
-    /* Scrivi batch file per sostituzione dopo l'uscita */
-    char *bat_content = str_fmt(
-        "@echo off\r\n"
-        "timeout /t 1 /nobreak >nul\r\n"
-        "move /y \"%s\" \"%s\"\r\n"
-        "echo flow aggiornato a v%s\r\n"
-        "del \"%%~f0\"\r\n",
-        exenew, exe, version
-    );
-    write_file(bat, bat_content);
-    free(bat_content);
-
-    /* Avvia il bat in background */
-    const char *bat_argv[] = { "cmd", "/c", "start", "/min", bat, NULL };
-    run_cmd(bat_argv);
-
-    printf(C_GREEN "✓" C_RESET " Aggiornamento preparato"
-           " — riapri il terminale per completare\n");
-    free(exenew); free(bat);
+        /* flow.exe non può essere sostituito mentre è in esecuzione — usa bat */
+        if (i == 0) {
+            char *dest    = str_fmt("%s\\%s%s", exe_dir, tools[i], ASSET_EXT);
+            char *destnew = str_fmt("%s.new", dest);
+            char *bat     = str_fmt("%s-update.bat", dest);
+            const char *mv1[] = { "move", "/y", tmp, destnew, NULL };
+            run_cmd(mv1);
+            char *bat_src = str_fmt(
+                "@echo off\r\ntimeout /t 1 /nobreak >nul\r\n"
+                "move /y \"%s\" \"%s\"\r\ndel \"%%~f0\"\r\n",
+                destnew, dest);
+            write_file(bat, bat_src);
+            free(bat_src);
+            const char *bat_argv[] = { "cmd", "/c", "start", "/min", bat, NULL };
+            run_cmd(bat_argv);
+            printf(" " C_GREEN "✓" C_RESET " (attiva al prossimo avvio)\n");
+            free(dest); free(destnew); free(bat);
+        } else {
+            char *dest = str_fmt("%s\\%s%s", exe_dir, tools[i], ASSET_EXT);
+            const char *mv[] = { "move", "/y", tmp, dest, NULL };
+            run_cmd(mv);
+            printf(" " C_GREEN "✓" C_RESET "\n");
+            free(dest);
+        }
 #else
-    /* POSIX: chmod + rename atomico */
-    chmod(tmpbin, 0755);
-    if (rename(tmpbin, exe) != 0) {
-        fprintf(stderr, C_RED "✗" C_RESET " impossibile sostituire il binario\n"
-                "  Prova con sudo o sposta manualmente:\n"
-                "  mv %s %s\n", tmpbin, exe);
-        free(tmpbin); free(version); free(home);
-        return 1;
-    }
-    printf(C_GREEN "✓" C_RESET " flow aggiornato a v%s\n", version);
+        char *dest = str_fmt("%s/%s%s", exe_dir, tools[i], ASSET_EXT);
+        chmod(tmp, 0755);
+        if (rename(tmp, dest) != 0) {
+            fprintf(stderr, " " C_RED "✗" C_RESET " (prova con sudo)\n");
+            errors++;
+        } else {
+            printf(" " C_GREEN "✓" C_RESET "\n");
+        }
+        free(dest);
 #endif
+        free(tmp); free(url); free(asset);
+    }
 
-    free(tmpbin); free(version); free(home);
-    return 0;
+    if (errors == 0) {
+#ifdef _WIN32
+        printf(C_GREEN "✓" C_RESET " Aggiornamento completato — riapri il terminale\n");
+#else
+        printf(C_GREEN "✓" C_RESET " flow e flowc aggiornati a v%s\n", version);
+#endif
+    }
+    free(bin_dir); free(exe_dir); free(json); free(version); free(home);
+    return errors > 0 ? 1 : 0;
 }
