@@ -86,24 +86,32 @@ export async function update() {
     process.stdout.write("Controllo aggiornamenti...")
 
     // 1. Controlla l'ultima versione disponibile
-    let latestVersion: string
+    let latestVersion: string | null = null
+
     try {
-        const res  = await fetch(RELEASES_URL, {
-            headers: { "User-Agent": "flow-cli" }
+        const res = await fetch(RELEASES_URL, {
+            headers: { "User-Agent": "flow-cli" },
+            signal: AbortSignal.timeout(5000),
         })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { tag_name: string }
-        latestVersion = data.tag_name.replace(/^v/, "")
-    } catch {
-        // Fallback: legge VERSION direttamente
-        try {
-            const res = await fetch(VERSION_URL, { headers: { "User-Agent": "flow-cli" } })
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            latestVersion = (await res.text()).trim()
-        } catch {
-            console.log(" \x1b[31mErrore: impossibile raggiungere il server\x1b[0m")
-            process.exit(1)
+        if (res.ok) {
+            const data = await res.json() as { tag_name: string }
+            latestVersion = data.tag_name.replace(/^v/, "")
         }
+    } catch {}
+
+    if (!latestVersion) {
+        try {
+            const res = await fetch(VERSION_URL, {
+                headers: { "User-Agent": "flow-cli" },
+                signal: AbortSignal.timeout(5000),
+            })
+            if (res.ok) latestVersion = (await res.text()).trim()
+        } catch {}
+    }
+
+    if (!latestVersion) {
+        console.log(` \x1b[33mImpossibile raggiungere il server — riprova più tardi\x1b[0m`)
+        return
     }
 
     if (latestVersion === CURRENT_VERSION) {
