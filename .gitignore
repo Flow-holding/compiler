@@ -4,6 +4,10 @@
 *.out
 flowc
 
+# File di debug Windows (MSVC/clang)
+*.ilk
+*.pdb
+
 # Output build
 dist/
 build/
