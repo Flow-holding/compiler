@@ -61,16 +61,20 @@ jobs:
         working-directory: cli
         shell: pwsh
         run: |
+          # Assicura clang nel PATH
+          $env:PATH = "C:\Program Files\LLVM\bin;$env:PATH"
           $CC = "clang"
-          $SRC = @("main.c","util.c","config.c","flowc.c","cmd_init.c","cmd_build.c","cmd_dev.c","cmd_update.c")
+          clang --version
+
+          $SRC = "main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c"
           New-Item -ItemType Directory -Force -Path ../dist | Out-Null
-          & $CC -O2 -DNDEBUG @SRC -o "../dist/${{ matrix.flow_out }}" -lws2_32
+
+          Invoke-Expression "$CC -O2 -DNDEBUG $SRC -o ../dist/${{ matrix.flow_out }} -lws2_32"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host "✓ ${{ matrix.flow_out }}"
 
-          $CSRC = @("main.c","lexer/lexer.c","parser/parser.c","codegen/codegen.c")
           Push-Location ../compiler
-          & $CC -O2 @CSRC -o "../dist/${{ matrix.flowc_out }}"
+          Invoke-Expression "$CC -O2 main.c lexer/lexer.c parser/parser.c codegen/codegen.c -o ../dist/${{ matrix.flowc_out }}"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host "✓ ${{ matrix.flowc_out }}"
           Pop-Location
