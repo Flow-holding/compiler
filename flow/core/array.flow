@@ -1,21 +1,46 @@
-@native("flow_array_new")
-fn arr<T>(): T[]
+// array — primitivi array dinamico (come Array JS)
 
-@native("flow_array_push")
-fn push<T>(a: T[], item: T): T[]
+@native("flow_arr_new")     fn arr<T>(): T[]
+@native("flow_arr_of")      fn arr_of<T>(items: T[]): T[]       // letterale [a, b, c]
+@native("flow_arr_fill")    fn fill<T>(len: int, val: T): T[]   // fill(5, 0) → [0,0,0,0,0]
+@native("flow_arr_range")   fn range(from: int, to: int): int[] // range(0, 5) → [0,1,2,3,4]
 
-@native("flow_array_get")
-fn get<T>(a: T[], i: int): T
+// ── Lettura ───────────────────────────────────────────────────────────────
+@native("flow_arr_get")     fn get<T>(a: T[], i: int): T
+@native("flow_arr_len")     fn len<T>(a: T[]): int
+@native("flow_arr_first")   fn first<T>(a: T[]): ?T
+@native("flow_arr_last")    fn last<T>(a: T[]): ?T
+@native("flow_arr_has")     fn has<T>(a: T[], item: T): bool
+@native("flow_arr_index")   fn index_of<T>(a: T[], item: T): int  // -1 se non trovato
 
-@native("flow_array_len")
-fn len<T>(a: T[]): int
+// ── Scrittura ─────────────────────────────────────────────────────────────
+@native("flow_arr_push")    fn push<T>(a: T[], item: T): T[]
+@native("flow_arr_pop")     fn pop<T>(a: T[]): T[]
+@native("flow_arr_unshift") fn unshift<T>(a: T[], item: T): T[]
+@native("flow_arr_shift")   fn shift<T>(a: T[]): T[]
+@native("flow_arr_set")     fn set<T>(a: T[], i: int, val: T): T[]
+@native("flow_arr_insert")  fn insert<T>(a: T[], i: int, val: T): T[]
+@native("flow_arr_remove")  fn remove<T>(a: T[], i: int): T[]
+@native("flow_arr_clear")   fn clear<T>(a: T[]): T[]
 
-// Metodi — disponibili su ogni array
-// lista.push(x)        →  aggiunge x in fondo
-// lista.get(0)         →  primo elemento
-// lista.len            →  numero elementi
-// lista.map((x) { })   →  trasforma ogni elemento
-// lista.filter((x) { })→  filtra elementi
-// lista.first          →  ?T — primo o null
-// lista.last           →  ?T — ultimo o null
-// lista.has(x)         →  bool
+// ── Trasformazione ────────────────────────────────────────────────────────
+@native("flow_arr_map")     fn map<T, U>(a: T[], f: fn(T): U): U[]
+@native("flow_arr_filter")  fn filter<T>(a: T[], f: fn(T): bool): T[]
+@native("flow_arr_reduce")  fn reduce<T, U>(a: T[], f: fn(U, T): U, init: U): U
+@native("flow_arr_flat")    fn flat<T>(a: T[][]): T[]
+@native("flow_arr_flatmap") fn flat_map<T, U>(a: T[], f: fn(T): U[]): U[]
+@native("flow_arr_slice")   fn slice<T>(a: T[], from: int, to?: int): T[]
+@native("flow_arr_concat")  fn concat<T>(a: T[], b: T[]): T[]
+@native("flow_arr_reverse") fn reverse<T>(a: T[]): T[]
+@native("flow_arr_sort")    fn sort<T>(a: T[], cmp?: fn(T, T): int): T[]
+@native("flow_arr_unique")  fn unique<T>(a: T[]): T[]
+
+// ── Ricerca ───────────────────────────────────────────────────────────────
+@native("flow_arr_find")    fn find<T>(a: T[], f: fn(T): bool): ?T
+@native("flow_arr_every")   fn every<T>(a: T[], f: fn(T): bool): bool
+@native("flow_arr_some")    fn some<T>(a: T[], f: fn(T): bool): bool
+@native("flow_arr_count")   fn count<T>(a: T[], f: fn(T): bool): int
+
+// ── Iterazione ────────────────────────────────────────────────────────────
+@native("flow_arr_each")    fn each<T>(a: T[], f: fn(T, int))
+@native("flow_arr_zip")     fn zip<T, U>(a: T[], b: U[]): [T, U][]

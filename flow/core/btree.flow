@@ -1,0 +1,30 @@
+// btree — B-tree ordinato (chiavi sempre sorte, ricerca O(log n))
+
+@native("flow_btree_new")      fn btree<K, V>(): BTree<K, V>
+
+// ── Scrittura ─────────────────────────────────────────────────────────────
+@native("flow_btree_insert")   fn insert<K, V>(t: BTree<K, V>, k: K, v: V): BTree<K, V>
+@native("flow_btree_delete")   fn delete<K, V>(t: BTree<K, V>, k: K): BTree<K, V>
+@native("flow_btree_clear")    fn clear<K, V>(t: BTree<K, V>): BTree<K, V>
+
+// ── Lettura ───────────────────────────────────────────────────────────────
+@native("flow_btree_get")      fn get<K, V>(t: BTree<K, V>, k: K): ?V
+@native("flow_btree_has")      fn has<K, V>(t: BTree<K, V>, k: K): bool
+@native("flow_btree_len")      fn len<K, V>(t: BTree<K, V>): int
+@native("flow_btree_min")      fn min_key<K, V>(t: BTree<K, V>): ?K
+@native("flow_btree_max")      fn max_key<K, V>(t: BTree<K, V>): ?K
+
+// ── Range queries ─────────────────────────────────────────────────────────
+@native("flow_btree_range")    fn range<K, V>(t: BTree<K, V>, from: K, to: K): [K, V][]
+@native("flow_btree_from")     fn from_key<K, V>(t: BTree<K, V>, k: K): [K, V][]
+@native("flow_btree_to")       fn to_key<K, V>(t: BTree<K, V>, k: K): [K, V][]
+
+// ── Iterazione (ordinata) ─────────────────────────────────────────────────
+@native("flow_btree_keys")     fn keys<K, V>(t: BTree<K, V>): K[]
+@native("flow_btree_values")   fn values<K, V>(t: BTree<K, V>): V[]
+@native("flow_btree_entries")  fn entries<K, V>(t: BTree<K, V>): [K, V][]
+@native("flow_btree_each")     fn each<K, V>(t: BTree<K, V>, f: fn(K, V))
+
+// ── Trasformazione ────────────────────────────────────────────────────────
+@native("flow_btree_map")      fn map_vals<K, V, U>(t: BTree<K, V>, f: fn(V, K): U): BTree<K, U>
+@native("flow_btree_filter")   fn filter<K, V>(t: BTree<K, V>, f: fn(V, K): bool): BTree<K, V>

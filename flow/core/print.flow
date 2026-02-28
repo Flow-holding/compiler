@@ -1,14 +1,8 @@
-@native("flow_print")
-fn print(s: str)
+// print — I/O base
 
-@native("flow_print_int")
-fn print(n: int)
-
-@native("flow_print_float")
-fn print(n: float)
-
-@native("flow_print_bool")
-fn print(b: bool)
-
-@native("flow_eprint")
-fn eprint(s: str)
+@native("flow_print")     fn print(v: any)              // stdout con newline
+@native("flow_print_raw") fn print_raw(v: any)          // stdout senza newline
+@native("flow_eprint")    fn eprint(v: any)             // stderr con newline
+@native("flow_dbg")       fn dbg<T>(v: T): T            // stampa e ritorna il valore (debug)
+@native("flow_read_line") fn read_line(): str           // legge una riga da stdin
+@native("flow_read_all")  fn read_all(): str            // legge tutto stdin

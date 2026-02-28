@@ -1,0 +1,49 @@
+// math — primitivi matematici
+
+// ── Costanti ─────────────────────────────────────────────────────────────
+let PI:  float = 3.141592653589793
+let E:   float = 2.718281828459045
+let INF: float = 1.0 / 0.0
+let NAN: float = 0.0 / 0.0
+
+// ── Aritmetica base ───────────────────────────────────────────────────────
+@native("flow_math_abs")    fn abs(x: float): float
+@native("flow_math_sign")   fn sign(x: float): int      // -1 | 0 | 1
+@native("flow_math_min")    fn min(a: float, b: float): float
+@native("flow_math_max")    fn max(a: float, b: float): float
+@native("flow_math_clamp")  fn clamp(v: float, lo: float, hi: float): float
+@native("flow_math_mod")    fn mod(a: float, b: float): float
+
+// ── Arrotondamento ────────────────────────────────────────────────────────
+@native("flow_math_floor")  fn floor(x: float): int
+@native("flow_math_ceil")   fn ceil(x: float): int
+@native("flow_math_round")  fn round(x: float): int
+@native("flow_math_trunc")  fn trunc(x: float): int
+
+// ── Potenze e radici ──────────────────────────────────────────────────────
+@native("flow_math_pow")    fn pow(base: float, exp: float): float
+@native("flow_math_sqrt")   fn sqrt(x: float): float
+@native("flow_math_cbrt")   fn cbrt(x: float): float
+@native("flow_math_log")    fn log(x: float): float       // ln
+@native("flow_math_log2")   fn log2(x: float): float
+@native("flow_math_log10")  fn log10(x: float): float
+@native("flow_math_exp")    fn exp(x: float): float       // e^x
+
+// ── Trigonometria ─────────────────────────────────────────────────────────
+@native("flow_math_sin")    fn sin(x: float): float
+@native("flow_math_cos")    fn cos(x: float): float
+@native("flow_math_tan")    fn tan(x: float): float
+@native("flow_math_asin")   fn asin(x: float): float
+@native("flow_math_acos")   fn acos(x: float): float
+@native("flow_math_atan")   fn atan(x: float): float
+@native("flow_math_atan2")  fn atan2(y: float, x: float): float
+
+// ── Random ────────────────────────────────────────────────────────────────
+@native("flow_math_random")     fn random(): float             // [0, 1)
+@native("flow_math_random_int") fn random_int(lo: int, hi: int): int  // [lo, hi]
+
+// ── Utility interi ────────────────────────────────────────────────────────
+@native("flow_math_gcd")    fn gcd(a: int, b: int): int
+@native("flow_math_lcm")    fn lcm(a: int, b: int): int
+@native("flow_math_is_nan") fn is_nan(x: float): bool
+@native("flow_math_is_inf") fn is_inf(x: float): bool

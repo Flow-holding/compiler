@@ -1,0 +1,48 @@
+// error — gestione errori, Result<T,E>, Option<T>
+
+// ── Panic ─────────────────────────────────────────────────────────────────
+@native("flow_panic")       fn panic(msg: str): never
+@native("flow_assert")      fn assert(cond: bool, msg?: str)
+@native("flow_todo")        fn todo(msg?: str): never       // segnaposto non implementato
+@native("flow_unreachable") fn unreachable(): never
+
+// ── Errori tipizzati ──────────────────────────────────────────────────────
+type Error {
+    msg:   str
+    code?: int
+    cause?: Error
+}
+
+@native("flow_err_new")     fn error(msg: str, code?: int): Error
+@native("flow_err_wrap")    fn wrap(cause: Error, msg: str): Error
+@native("flow_err_msg")     fn err_msg(e: Error): str
+
+// ── Result<T, E> ──────────────────────────────────────────────────────────
+//   usato come tipo di ritorno per funzioni che possono fallire
+//
+//   fn parse(s: str): Result<int, Error> {
+//       let n = parse_int(s)
+//       if is_null(n) { return err(error("parse fallito")) }
+//       return ok(n!)
+//   }
+//
+//   let r = parse("42")
+//   match r {
+//       ok(n)  -> print(n)
+//       err(e) -> print(e.msg)
+//   }
+
+// ── Option<T> ─────────────────────────────────────────────────────────────
+//   equivalente a ?T — usato quando il valore può non esserci
+//
+//   fn find_user(id: int): Option<User> { ... }
+//
+//   let u = find_user(1)
+//   let name = u ?? "anonimo"     // null coalescing
+//   let name = u?.name            // optional chaining
+
+// ── Try operator ──────────────────────────────────────────────────────────
+//   fn load(): Result<Data, Error> {
+//       let raw = read_file("data.json")?   // propaga l'errore se err
+//       return ok(parse(raw))
+//   }

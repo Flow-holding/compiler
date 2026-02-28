@@ -1,0 +1,34 @@
+// iter — iteratori lazy (come generator JS / iter Rust)
+
+// ── Creazione ─────────────────────────────────────────────────────────────
+@native("flow_iter_range")     fn iter_range(from: int, to: int, step?: int): Iter<int>
+@native("flow_iter_repeat")    fn iter_repeat<T>(v: T): Iter<T>         // infinito
+@native("flow_iter_once")      fn iter_once<T>(v: T): Iter<T>
+@native("flow_iter_empty")     fn iter_empty<T>(): Iter<T>
+@native("flow_iter_from_arr")  fn iter<T>(a: T[]): Iter<T>
+
+// ── Trasformazione (lazy) ─────────────────────────────────────────────────
+@native("flow_iter_map")       fn imap<T, U>(it: Iter<T>, f: fn(T): U): Iter<U>
+@native("flow_iter_filter")    fn ifilter<T>(it: Iter<T>, f: fn(T): bool): Iter<T>
+@native("flow_iter_flat_map")  fn iflatmap<T, U>(it: Iter<T>, f: fn(T): Iter<U>): Iter<U>
+@native("flow_iter_take")      fn take<T>(it: Iter<T>, n: int): Iter<T>
+@native("flow_iter_skip")      fn skip<T>(it: Iter<T>, n: int): Iter<T>
+@native("flow_iter_take_while") fn take_while<T>(it: Iter<T>, f: fn(T): bool): Iter<T>
+@native("flow_iter_skip_while") fn skip_while<T>(it: Iter<T>, f: fn(T): bool): Iter<T>
+@native("flow_iter_zip")       fn izip<T, U>(a: Iter<T>, b: Iter<U>): Iter<[T, U]>
+@native("flow_iter_enumerate") fn enumerate<T>(it: Iter<T>): Iter<[int, T]>
+@native("flow_iter_chain")     fn chain<T>(a: Iter<T>, b: Iter<T>): Iter<T>
+@native("flow_iter_peek")      fn peekable<T>(it: Iter<T>): PeekIter<T>
+
+// ── Consumo (eager) ───────────────────────────────────────────────────────
+@native("flow_iter_collect")   fn collect<T>(it: Iter<T>): T[]
+@native("flow_iter_reduce")    fn ireduce<T, U>(it: Iter<T>, f: fn(U, T): U, init: U): U
+@native("flow_iter_each")      fn ieach<T>(it: Iter<T>, f: fn(T))
+@native("flow_iter_count")     fn icount<T>(it: Iter<T>): int
+@native("flow_iter_find")      fn ifind<T>(it: Iter<T>, f: fn(T): bool): ?T
+@native("flow_iter_any")       fn iany<T>(it: Iter<T>, f: fn(T): bool): bool
+@native("flow_iter_all")       fn iall<T>(it: Iter<T>, f: fn(T): bool): bool
+@native("flow_iter_sum")       fn isum(it: Iter<int>): int
+@native("flow_iter_min")       fn imin<T>(it: Iter<T>): ?T
+@native("flow_iter_max")       fn imax<T>(it: Iter<T>): ?T
+@native("flow_iter_next")      fn next<T>(it: Iter<T>): ?T

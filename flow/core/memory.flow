@@ -1,0 +1,32 @@
+// memory — allocazione e gestione memoria raw
+
+// ── Allocazione ───────────────────────────────────────────────────────────
+@native("flow_mem_alloc")   fn alloc(bytes: int): ptr               // malloc
+@native("flow_mem_calloc")  fn calloc(n: int, size: int): ptr       // malloc + zero
+@native("flow_mem_realloc") fn realloc(p: ptr, bytes: int): ptr
+@native("flow_mem_free")    fn free(p: ptr)
+
+// ── Lettura / scrittura raw ───────────────────────────────────────────────
+@native("flow_mem_read8")   fn read8(p: ptr, offset: int): byte
+@native("flow_mem_read16")  fn read16(p: ptr, offset: int): int
+@native("flow_mem_read32")  fn read32(p: ptr, offset: int): int
+@native("flow_mem_read64")  fn read64(p: ptr, offset: int): int
+@native("flow_mem_write8")  fn write8(p: ptr, offset: int, v: byte)
+@native("flow_mem_write16") fn write16(p: ptr, offset: int, v: int)
+@native("flow_mem_write32") fn write32(p: ptr, offset: int, v: int)
+@native("flow_mem_write64") fn write64(p: ptr, offset: int, v: int)
+
+// ── Copia e confronto ─────────────────────────────────────────────────────
+@native("flow_mem_copy")    fn mem_copy(dst: ptr, src: ptr, n: int)
+@native("flow_mem_move")    fn mem_move(dst: ptr, src: ptr, n: int)
+@native("flow_mem_set")     fn mem_set(p: ptr, val: byte, n: int)
+@native("flow_mem_eq")      fn mem_eq(a: ptr, b: ptr, n: int): bool
+
+// ── Puntatori ─────────────────────────────────────────────────────────────
+@native("flow_mem_addr")    fn addr_of<T>(v: T): ptr   // puntatore a un valore
+@native("flow_mem_deref")   fn deref<T>(p: ptr): T     // dereference
+@native("flow_mem_offset")  fn offset(p: ptr, n: int): ptr
+
+// ── Info ──────────────────────────────────────────────────────────────────
+@native("flow_mem_size_of") fn size_of<T>(): int
+@native("flow_mem_align_of") fn align_of<T>(): int

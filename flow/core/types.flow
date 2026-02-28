@@ -1,33 +1,45 @@
-// ── Primitivi ──────────────────────────────
-str          // "ciao mondo"
-int          // 42
-float        // 3.14
-bool         // true / false
-void         // nessun valore di ritorno
-any          // tipo dinamico — usare solo se necessario
+// types — primitivi di tipo base
 
-// ── Collezioni ─────────────────────────────
-str[]        // array →  ["a", "b", "c"]
-{str: int}   // mappa →  { "mario": 25 }
+// ── Tipi scalari ─────────────────────────────────────────────────────────
+//   int        intero 64-bit con segno
+//   float      floating point 64-bit (IEEE 754)
+//   bool       true | false
+//   str        stringa UTF-8 immutabile
+//   byte       intero 8-bit senza segno
+//   rune       codepoint Unicode (int 32-bit)
+//   any        tipo dinamico (escape hatch)
+//   void       nessun valore di ritorno
+//   never      funzione che non ritorna mai (panic / loop infinito)
 
-// ── Opzionale ──────────────────────────────
-?str         // str oppure null
-             // accesso sicuro:  utente?.email
-             // fallback:        utente?.email ?? "nessuna"
+// ── Tipi nullable ────────────────────────────────────────────────────────
+//   ?T         valore opzionale — può essere null
+//   T!         unwrap forzato — panic se null
 
-// ── Risultato / Errore ──────────────────────
-str | err    // ritorna str oppure errore
-             // uso: match risultato { ok(v) { } err(e) { } }
+// ── Conversioni esplicite ─────────────────────────────────────────────────
+@native("flow_cast_int")    fn int(v: any): int
+@native("flow_cast_float")  fn float(v: any): float
+@native("flow_cast_bool")   fn bool(v: any): bool
+@native("flow_cast_str")    fn str(v: any): str
+@native("flow_cast_byte")   fn byte(v: any): byte
 
-// ── Funzioni come tipo ──────────────────────
-fn(str)           // funzione che prende str, non ritorna niente
-fn(str): int      // funzione che prende str, ritorna int
-fn(int, int): int // funzione con due parametri
+// ── Ispezione tipo ────────────────────────────────────────────────────────
+@native("flow_typeof")      fn typeof(v: any): str
+@native("flow_sizeof")      fn sizeof<T>(): int
 
-// ── Struct custom ───────────────────────────
-// Si definiscono con = { } — vedi esempi:
-// Utente = { nome: str, età: int, email: ?str }
+// ── Risultati e opzionali ─────────────────────────────────────────────────
+//   Result<T, E>   ok(value) | err(error)
+//   Option<T>      some(value) | none
 
-// ── Casting ─────────────────────────────────
-// x as int     // converti x a int
-// x as str     // converti x a str
+@native("flow_ok")    fn ok<T>(v: T): Result<T, never>
+@native("flow_err")   fn err<E>(e: E): Result<never, E>
+@native("flow_some")  fn some<T>(v: T): Option<T>
+@native("flow_none")  fn none<T>(): Option<T>
+
+@native("flow_is_ok")   fn is_ok<T, E>(r: Result<T, E>): bool
+@native("flow_is_err")  fn is_err<T, E>(r: Result<T, E>): bool
+@native("flow_unwrap")  fn unwrap<T, E>(r: Result<T, E>): T
+@native("flow_unwrap_or") fn unwrap_or<T, E>(r: Result<T, E>, default: T): T
+
+// ── Identità ─────────────────────────────────────────────────────────────
+@native("flow_is_null")  fn is_null(v: any): bool
+@native("flow_is_same")  fn is_same(a: any, b: any): bool    // identità riferimento

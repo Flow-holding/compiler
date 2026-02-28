@@ -1,22 +1,26 @@
-@native("flow_map_new")
-fn map<K, V>(): {K: V}
+// map — hashtable primitiva (come Map/Object JS)
 
-@native("flow_map_set")
-fn set<K, V>(m: {K: V}, key: K, val: V)
+@native("flow_map_new")     fn map<K, V>(): map<K, V>
+@native("flow_map_of")      fn map_of<K, V>(pairs: [K, V][]): map<K, V>
 
-@native("flow_map_get")
-fn get<K, V>(m: {K: V}, key: K): ?V
+// ── Lettura ───────────────────────────────────────────────────────────────
+@native("flow_map_get")     fn get<K, V>(m: map<K, V>, k: K): ?V
+@native("flow_map_has")     fn has<K, V>(m: map<K, V>, k: K): bool
+@native("flow_map_len")     fn len<K, V>(m: map<K, V>): int
+@native("flow_map_keys")    fn keys<K, V>(m: map<K, V>): K[]
+@native("flow_map_values")  fn values<K, V>(m: map<K, V>): V[]
+@native("flow_map_entries") fn entries<K, V>(m: map<K, V>): [K, V][]
 
-@native("flow_map_has")
-fn has<K, V>(m: {K: V}, key: K): bool
+// ── Scrittura ─────────────────────────────────────────────────────────────
+@native("flow_map_set")     fn set<K, V>(m: map<K, V>, k: K, v: V): map<K, V>
+@native("flow_map_delete")  fn delete<K, V>(m: map<K, V>, k: K): map<K, V>
+@native("flow_map_clear")   fn clear<K, V>(m: map<K, V>): map<K, V>
+@native("flow_map_merge")   fn merge<K, V>(a: map<K, V>, b: map<K, V>): map<K, V>
 
-@native("flow_map_len")
-fn len<K, V>(m: {K: V}): int
+// ── Trasformazione ────────────────────────────────────────────────────────
+@native("flow_map_map")     fn map_vals<K, V, U>(m: map<K, V>, f: fn(V, K): U): map<K, U>
+@native("flow_map_filter")  fn filter<K, V>(m: map<K, V>, f: fn(V, K): bool): map<K, V>
+@native("flow_map_each")    fn each<K, V>(m: map<K, V>, f: fn(V, K))
 
-// Metodi — disponibili su ogni mappa
-// m.set("key", val)    →  inserisce o aggiorna
-// m.get("key")         →  ?V — valore o null
-// m.has("key")         →  bool
-// m.len                →  numero di chiavi
-// m.keys               →  str[] — tutte le chiavi
-// m.values             →  V[]  — tutti i valori
+// ── da/per altri tipi ─────────────────────────────────────────────────────
+@native("flow_map_from_arr") fn map_from<K, V>(a: V[], key_fn: fn(V): K): map<K, V>

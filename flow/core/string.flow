@@ -1,25 +1,41 @@
-@native("flow_str_concat")
-fn concat(a: str, b: str): str
+// string — primitivi stringa
 
-@native("flow_str_eq")
-fn eq(a: str, b: str): bool
+@native("flow_str_len")        fn len(s: str): int
+@native("flow_str_bytes")      fn bytes(s: str): byte[]
+@native("flow_str_chars")      fn chars(s: str): rune[]
 
-@native("flow_str_len")
-fn len(s: str): int
+// ── Ricerca ───────────────────────────────────────────────────────────────
+@native("flow_str_contains")   fn contains(s: str, sub: str): bool
+@native("flow_str_starts")     fn starts_with(s: str, prefix: str): bool
+@native("flow_str_ends")       fn ends_with(s: str, suffix: str): bool
+@native("flow_str_index")      fn index_of(s: str, sub: str): int    // -1 se non trovato
+@native("flow_str_count")      fn count(s: str, sub: str): int
 
-// Metodi — disponibili su ogni str
-// s.len                  →  int
-// s.upper                →  str
-// s.lower                →  str
-// s.trim                 →  str
-// s.split(",")           →  str[]
-// s.contains("ciao")     →  bool
-// s.starts("http")       →  bool
-// s.ends(".flow")        →  bool
-// s.replace("a", "b")    →  str
-// s.slice(0, 5)          →  str
+// ── Trasformazione ────────────────────────────────────────────────────────
+@native("flow_str_upper")      fn to_upper(s: str): str
+@native("flow_str_lower")      fn to_lower(s: str): str
+@native("flow_str_trim")       fn trim(s: str): str
+@native("flow_str_trim_start") fn trim_start(s: str): str
+@native("flow_str_trim_end")   fn trim_end(s: str): str
+@native("flow_str_replace")    fn replace(s: str, from: str, to: str): str
+@native("flow_str_replace_all") fn replace_all(s: str, from: str, to: str): str
+@native("flow_str_slice")      fn slice(s: str, from: int, to?: int): str
+@native("flow_str_pad_start")  fn pad_start(s: str, len: int, ch?: str): str
+@native("flow_str_pad_end")    fn pad_end(s: str, len: int, ch?: str): str
+@native("flow_str_repeat")     fn repeat(s: str, n: int): str
+@native("flow_str_reverse")    fn reverse(s: str): str
 
-// Operatori — il compiler li mappa automaticamente
-// "a" + "b"   →  concat
-// a == b      →  eq
-// "Ciao {nome}" → interpolazione con { }
+// ── Split / Join ─────────────────────────────────────────────────────────
+@native("flow_str_split")      fn split(s: str, sep: str): str[]
+@native("flow_str_split_n")    fn split_n(s: str, sep: str, n: int): str[]
+@native("flow_str_join")       fn join(parts: str[], sep: str): str
+@native("flow_str_lines")      fn lines(s: str): str[]
+
+// ── Parse ─────────────────────────────────────────────────────────────────
+@native("flow_str_parse_int")   fn parse_int(s: str): ?int
+@native("flow_str_parse_float") fn parse_float(s: str): ?float
+@native("flow_str_parse_bool")  fn parse_bool(s: str): ?bool
+
+// ── Formato ───────────────────────────────────────────────────────────────
+@native("flow_str_fmt")        fn fmt(template: str, args: any[]): str
+@native("flow_str_char_at")    fn char_at(s: str, i: int): rune
