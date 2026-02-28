@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+  #include <sys/stat.h>
+#endif
 
 /* Piattaforma e arch corrente */
 #ifdef _WIN32
