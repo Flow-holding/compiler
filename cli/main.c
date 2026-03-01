@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "cli.h"
-#include "cmd_init.h"
-#include "cmd_build.h"
-#include "cmd_dev.h"
-#include "cmd_update.h"
+#include "config.h"
+#include "cmd/cmd_init.h"
+#include "cmd/cmd_build.h"
+#include "cmd/cmd_dev.h"
+#include "cmd/cmd_update.h"
 #ifdef _WIN32
   #include <windows.h>
 #endif
@@ -27,6 +28,12 @@ int main(int argc, char **argv) {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
 #endif
+    /* Raccoglie override globali da qualsiasi posizione in argv */
+    for (int i = 2; i < argc - 1; i++) {
+        if (!strcmp(argv[i], "--runtime")) g_cli_runtime = argv[i + 1];
+        if (!strcmp(argv[i], "--flow"))    g_cli_flow    = argv[i + 1];
+    }
+
     const char *cmd = argc > 1 ? argv[1] : NULL;
 
     if (!cmd

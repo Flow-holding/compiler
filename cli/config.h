@@ -5,8 +5,13 @@ typedef struct {
     char *entry;
     char *out;
     char *runtime;
+    char *flow;
 } FlowConfig;
 
-/* Legge flow.config.json dalla cwd. Ritorna 1 ok, 0 errore. */
+/* Override da CLI — impostati in main() prima di config_load() */
+extern char *g_cli_runtime;
+extern char *g_cli_flow;
+
+/* Carica la config (flow.config.json opzionale). Sempre 1. */
 int  config_load(FlowConfig *cfg);
 void config_free(FlowConfig *cfg);

@@ -24,8 +24,8 @@ add_subdirectory(${WEBVIEW_DIR} ${CMAKE_BINARY_DIR}/webview EXCLUDE_FROM_ALL)
 # Flow CLI
 add_executable(flow
     main.c util.c config.c flowc.c
-    cmd_init.c cmd_build.c cmd_dev.c cmd_update.c
-    wv_webview.c
+    cmd/cmd_init.c cmd/cmd_build.c cmd/cmd_dev.c cmd/cmd_update.c
+    webview/wv_webview.c
 )
 
 target_include_directories(flow PRIVATE

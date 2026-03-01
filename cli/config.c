@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+char *g_cli_runtime = NULL;
+char *g_cli_flow    = NULL;
+
 /* Estrae il valore stringa di una chiave JSON — solo per stringhe semplici */
 static char *json_str(const char *json, const char *key) {
     char search[128];
@@ -27,29 +30,37 @@ static char *json_str(const char *json, const char *key) {
     return v;
 }
 
+/* Ritorna l'ultimo segmento del path (nome cartella) */
+static char *path_basename(const char *p) {
+    const char *last = p;
+    for (const char *s = p; *s; s++)
+        if (*s == '/' || *s == '\\') last = s + 1;
+    return str_dup(*last ? last : p);
+}
+
 int config_load(FlowConfig *cfg) {
     char *cwd  = get_cwd();
     char *path = path_join(cwd, "flow.config.json");
-    free(cwd);
-
     char *json = read_file(path);
     free(path);
 
-    if (!json) {
-        fprintf(stderr, C_RED "✗" C_RESET " flow.config.json non trovato"
-                " — sei nella cartella del progetto?\n");
-        return 0;
-    }
-
-    cfg->name    = json_str(json, "name");
-    cfg->entry   = json_str(json, "entry");
-    cfg->out     = json_str(json, "out");
-    cfg->runtime = json_str(json, "runtime");
+    /* flow.config.json è opzionale — se manca si usano i defaults */
+    cfg->name    = json ? json_str(json, "name")    : NULL;
+    cfg->entry   = json ? json_str(json, "entry")   : NULL;
+    cfg->out     = json ? json_str(json, "out")     : NULL;
+    cfg->runtime = json ? json_str(json, "runtime") : NULL;
+    cfg->flow    = json ? json_str(json, "flow")    : NULL;
     free(json);
 
+    if (!cfg->name)  cfg->name  = path_basename(cwd);
     if (!cfg->entry) cfg->entry = str_dup("client/root.flow");
     if (!cfg->out)   cfg->out   = str_dup("out");
 
+    /* Override da CLI (--runtime, --flow) */
+    if (g_cli_runtime) { free(cfg->runtime); cfg->runtime = str_dup(g_cli_runtime); }
+    if (g_cli_flow)    { free(cfg->flow);    cfg->flow    = str_dup(g_cli_flow); }
+
+    free(cwd);
     return 1;
 }
 
@@ -58,4 +69,5 @@ void config_free(FlowConfig *cfg) {
     free(cfg->entry);
     free(cfg->out);
     free(cfg->runtime);
+    free(cfg->flow);
 }

@@ -1,8 +1,8 @@
-# cli/build.ps1 — Build del CLI Flow (Windows)
+# cli/scripts/build.ps1 — Build del CLI Flow (Windows)
 # Con webview cross-platform (WebView2 su Windows)
-# Uso: .\build.ps1           (debug)
-#      .\build.ps1 -prod     (ottimizzato)
-#      .\build.ps1 -out flow.exe
+# Uso (dalla cartella cli/): .\scripts\build.ps1
+#      .\scripts\build.ps1 -prod     (ottimizzato)
+#      .\scripts\build.ps1 -out flow.exe
 # Richiede: deps/webview-tmp (git clone webview), deps/webview2 (auto-download)
 
 param(
@@ -12,8 +12,8 @@ param(
 
 $SRC_C = @(
     "main.c", "util.c", "config.c", "flowc.c",
-    "cmd_init.c", "cmd_build.c", "cmd_dev.c", "cmd_update.c",
-    "wv_webview.c"
+    "cmd\cmd_init.c", "cmd\cmd_build.c", "cmd\cmd_dev.c", "cmd\cmd_update.c",
+    "webview\wv_webview.c"
 )
 
 $WEBVIEW_CC = "deps\webview-tmp\core\src\webview.cc"
@@ -39,7 +39,7 @@ if (-not (Test-Path "deps\webview-tmp\core\src\webview.cc")) {
     exit 1
 }
 
-$INC = "-I`"deps\webview-tmp\core\include`" -I`"$WV2_INC`""
+$INC = "-I. -I`"deps\webview-tmp\core\include`" -I`"$WV2_INC`""
 $CFLAGS = "$INC -D_WIN32_WINNT=0x0A00 -D_CRT_SECURE_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS"
 
 Write-Host "Build CLI Flow (Windows + webview)..." -ForegroundColor Cyan

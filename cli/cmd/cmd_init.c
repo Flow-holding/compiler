@@ -1,6 +1,6 @@
 #include "cmd_init.h"
-#include "util.h"
-#include "cli.h"
+#include "../util.h"
+#include "../cli.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

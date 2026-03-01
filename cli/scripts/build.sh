@@ -1,9 +1,9 @@
 #!/bin/sh
-# cli/build.sh — Build del CLI Flow (Linux/macOS)
+# cli/scripts/build.sh — Build del CLI Flow (Linux/macOS)
 # Con webview cross-platform (WebKit su macOS, WebKitGTK su Linux)
-# Uso: ./build.sh            (debug)
-#      ./build.sh --prod     (ottimizzato)
-#      ./build.sh --out flow
+# Uso (dalla cartella cli/): bash scripts/build.sh
+#      bash scripts/build.sh --prod     (ottimizzato)
+#      bash scripts/build.sh --out flow
 # Linux: apt install libgtk-3-dev libwebkit2gtk-4.1-dev
 
 PROD=0
@@ -16,7 +16,7 @@ for arg in "$@"; do
     esac
 done
 
-SRC_C="main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c wv_webview.c"
+SRC_C="main.c util.c config.c flowc.c cmd/cmd_init.c cmd/cmd_build.c cmd/cmd_dev.c cmd/cmd_update.c webview/wv_webview.c"
 WEBVIEW_SRC="deps/webview-tmp/core/src/webview.cc"
 
 if [ "$PROD" = "1" ]; then
@@ -25,7 +25,7 @@ else
     FLAGS="-g -O0"
 fi
 
-INC="-Ideps/webview-tmp/core/include"
+INC="-I. -Ideps/webview-tmp/core/include"
 
 # Platform-specific: webview deps
 OS=$(uname -s)

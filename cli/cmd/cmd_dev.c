@@ -1,9 +1,9 @@
 #include "cmd_dev.h"
 #include "cmd_build.h"
-#include "config.h"
-#include "util.h"
-#include "cli.h"
-#include "wv.h"
+#include "../config.h"
+#include "../util.h"
+#include "../cli.h"
+#include "../webview/wv.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -280,7 +280,7 @@ int cmd_dev(void) {
     if (!config_load(&cfg)) return 1;
 
     char *cwd    = get_cwd();
-    char *srcdir = path_join(cwd, "src");
+    char *srcdir = path_join(cwd, "client");
     char *outdir = path_join(cwd, cfg.out);
     strncpy(g_outdir, outdir, sizeof(g_outdir) - 1);
     g_outdir[sizeof(g_outdir) - 1] = '\0';
