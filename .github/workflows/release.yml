@@ -69,7 +69,7 @@ jobs:
           $SRC = "main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c wv_stub.c"
           New-Item -ItemType Directory -Force -Path ../dist | Out-Null
 
-          Invoke-Expression "$CC -O2 -DNDEBUG -D_CRT_SECURE_NO_WARNINGS $SRC -o ../dist/${{ matrix.flow_out }} -lws2_32"
+          Invoke-Expression "$CC -O2 -DNDEBUG -D_CRT_SECURE_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS $SRC -o ../dist/${{ matrix.flow_out }} -lws2_32"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host "✓ ${{ matrix.flow_out }}"
 
@@ -85,7 +85,7 @@ jobs:
         shell: bash
         run: |
           CC="${{ matrix.cc || 'clang' }}"
-          SRC="main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c"
+          SRC="main.c util.c config.c flowc.c cmd_init.c cmd_build.c cmd_dev.c cmd_update.c wv_stub.c"
           mkdir -p ../dist
 
           $CC -O2 -DNDEBUG ${{ matrix.cc_flags }} $SRC \

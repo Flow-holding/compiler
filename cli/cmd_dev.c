@@ -246,6 +246,9 @@ static int watch_changed(WatchState *ws, const char *srcdir) {
 
 #ifdef _WIN32
 static DWORD WINAPI watcher_thread(LPVOID arg) {
+#else
+static void *watcher_thread(void *arg) {
+#endif
     char *srcdir = (char*)arg;
     WatchState ws = watch_init(srcdir);
     int pending = 0, last = 0, tick = 0;
@@ -263,9 +266,12 @@ static DWORD WINAPI watcher_thread(LPVOID arg) {
     }
     for (int i = 0; i < ws.n; i++) free(ws.paths[i]);
     free(ws.paths); free(ws.mtimes);
+#ifdef _WIN32
     return 0;
-}
+#else
+    return NULL;
 #endif
+}
 
 /* ── Comando principale ────────────────────────────────────────────────── */
 
@@ -334,11 +340,26 @@ int cmd_dev(void) {
 
 #ifdef _WIN32
     CreateThread(NULL, 0, http_thread, (LPVOID)(intptr_t)server, 0, NULL);
+#else
+    {
+        pthread_t tid;
+        pthread_create(&tid, NULL, http_thread, (void*)(intptr_t)server);
+        pthread_detach(tid);
+    }
+#endif
 
     g_wv = wv_create(1024, 768, "Flow dev");
     if (g_wv) {
         wv_navigate(g_wv, "http://localhost:3000");
+#ifdef _WIN32
         CreateThread(NULL, 0, watcher_thread, srcdir, 0, NULL);
+#else
+        {
+            pthread_t wtid;
+            pthread_create(&wtid, NULL, watcher_thread, srcdir);
+            pthread_detach(wtid);
+        }
+#endif
         wv_run(g_wv);
         g_running = 0;
         wv_destroy(g_wv);
@@ -356,23 +377,6 @@ int cmd_dev(void) {
         for (int i = 0; i < ws.n; i++) free(ws.paths[i]);
         free(ws.paths); free(ws.mtimes);
     }
-#else
-    pthread_t tid;
-    pthread_create(&tid, NULL, http_thread, (void*)(intptr_t)server);
-    pthread_detach(tid);
-
-    WatchState ws = watch_init(srcdir);
-    int pending = 0, last = 0, tick = 0;
-    while (g_running) {
-        sleep_ms(50); tick++;
-        if (watch_changed(&ws, srcdir)) { pending = 1; last = tick; }
-        if (!pending || tick - last < 2) continue;
-        pending = 0;
-            cmd_build(0, 0, 1, 0);
-    }
-    for (int i = 0; i < ws.n; i++) free(ws.paths[i]);
-    free(ws.paths); free(ws.mtimes);
-#endif
 
     printf(C_FLOW "\n  \u2190" C_RESET " stop\n");
     sock_close(server);

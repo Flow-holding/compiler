@@ -1,8 +1,6 @@
-/* wv_stub.c — stub per build release senza WebView2 (CI/GitHub Actions)
+/* wv_stub.c — stub per build release senza webview (CI/GitHub Actions)
    Fornisce implementazioni vuote di wv_*; flow dev funziona senza finestra
    (solo server HTTP + watcher, apri http://localhost:3000 nel browser) */
-
-#ifdef _WIN32
 
 #include "wv.h"
 #include <stddef.h>
@@ -35,5 +33,3 @@ void wv_close(wv_handle_t h) {
 void wv_destroy(wv_handle_t h) {
     (void)h;
 }
-
-#endif /* _WIN32 */

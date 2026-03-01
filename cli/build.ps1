@@ -1,8 +1,9 @@
 # cli/build.ps1 — Build del CLI Flow (Windows)
-# Con WebView2 nativo per flow dev
+# Con webview cross-platform (WebView2 su Windows)
 # Uso: .\build.ps1           (debug)
 #      .\build.ps1 -prod     (ottimizzato)
 #      .\build.ps1 -out flow.exe
+# Richiede: deps/webview-tmp (git clone webview), deps/webview2 (auto-download)
 
 param(
     [switch]$prod,
@@ -11,56 +12,58 @@ param(
 
 $SRC_C = @(
     "main.c", "util.c", "config.c", "flowc.c",
-    "cmd_init.c", "cmd_build.c", "cmd_dev.c", "cmd_update.c"
+    "cmd_init.c", "cmd_build.c", "cmd_dev.c", "cmd_update.c",
+    "wv_webview.c"
 )
 
-$WV_CPP = "wv.cpp"
+$WEBVIEW_CC = "deps\webview-tmp\core\src\webview.cc"
 $FLAGS  = if ($prod) { "-O2 -DNDEBUG" } else { "-g -O0" }
-$LFLAGS = "-lws2_32 -lole32 -luser32"
+$LFLAGS = "-lws2_32 -ladvapi32 -lole32 -lshell32 -lshlwapi -luser32 -lversion"
 
 # WebView2: scarica deps se mancanti
-$WV_DIR = "deps\webview2"
-$WV_INC = "$WV_DIR\build\native\include"
-$WV_LIB = "$WV_DIR\build\native\x64"
-$WV_DLL = "$WV_DIR\build\native\x64\WebView2Loader.dll"
+$WV2_DIR = "deps\webview2"
+$WV2_INC = "$WV2_DIR\build\native\include"
 
-if (-not (Test-Path $WV_INC)) {
+if (-not (Test-Path $WV2_INC)) {
     Write-Host "Scarico WebView2 SDK..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Force deps | Out-Null
     Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2210.55" -OutFile "deps\webview2.nupkg" -UseBasicParsing
     Copy-Item "deps\webview2.nupkg" "deps\webview2.zip"
-    Expand-Archive -Path "deps\webview2.zip" -DestinationPath $WV_DIR -Force
+    Expand-Archive -Path "deps\webview2.zip" -DestinationPath $WV2_DIR -Force
 }
 
-$WV_CFLAGS = "-I`"$WV_INC`" -D_WIN32_WINNT=0x0A00 -D_CRT_SECURE_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS"
-$WV_LINK   = "`"$WV_LIB\WebView2Loader.dll.lib`""
+# Webview: verifica presenza
+if (-not (Test-Path "deps\webview-tmp\core\src\webview.cc")) {
+    Write-Host "Webview non trovato. Esegui:" -ForegroundColor Red
+    Write-Host "  git clone --depth 1 https://github.com/webview/webview.git deps/webview-tmp" -ForegroundColor Yellow
+    exit 1
+}
 
-Write-Host "Build CLI Flow (Windows + WebView2)..." -ForegroundColor Cyan
+$INC = "-I`"deps\webview-tmp\core\include`" -I`"$WV2_INC`""
+$CFLAGS = "$INC -D_WIN32_WINNT=0x0A00 -D_CRT_SECURE_NO_WARNINGS -D_WINSOCK_DEPRECATED_NO_WARNINGS"
+
+Write-Host "Build CLI Flow (Windows + webview)..." -ForegroundColor Cyan
 
 # Compila C
 $cFiles = $SRC_C | ForEach-Object { "`"$_`"" }
-$cmdC = "clang $FLAGS $WV_CFLAGS $($cFiles -join ' ') -c"
+$cmdC = "clang $FLAGS $CFLAGS $($cFiles -join ' ') -c"
 Write-Host "  $cmdC"
 Invoke-Expression $cmdC
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
-# Compila wv.cpp (C++)
-$cmdCpp = "clang++ $FLAGS $WV_CFLAGS -std=c++17 -c `"$WV_CPP`""
+# Compila webview.cc (C++)
+$cmdCpp = "clang++ $FLAGS $CFLAGS -std=c++14 -DWEBVIEW_STATIC -c `"$WEBVIEW_CC`""
 Write-Host "  $cmdCpp"
 Invoke-Expression $cmdCpp
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
 # Link
-$objFiles = ($SRC_C + $WV_CPP) | ForEach-Object { (Get-Item $_).BaseName + ".o" } | ForEach-Object { "`"$_`"" }
-$cmdLink = "clang++ $($objFiles -join ' ') -o `"$out`" $LFLAGS $WV_LINK"
+$objFiles = ($SRC_C | ForEach-Object { (Get-Item $_).BaseName + ".o" }) + @("webview.o")
+$objQuoted = ($objFiles | ForEach-Object { "`"$_`"" }) -join " "
+$cmdLink = "clang++ $objQuoted -o `"$out`" $LFLAGS"
 Write-Host "  $cmdLink"
 Invoke-Expression $cmdLink
 if ($LASTEXITCODE -ne 0) { exit 1 }
-
-# Copia WebView2Loader.dll accanto all'exe
-$outDir = Split-Path $out -Parent
-if ($outDir) { $dllDest = Join-Path $outDir "WebView2Loader.dll" } else { $dllDest = "WebView2Loader.dll" }
-Copy-Item $WV_DLL $dllDest -Force
 
 # Cleanup .o
 Get-ChildItem *.o -ErrorAction SilentlyContinue | Remove-Item
