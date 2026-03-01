@@ -1,23 +1,9 @@
 default Home() {
-    count = 0
-
     return (
-        
-        <text
-            value="Benssskllssaaaassasssddsasaskklop"
-            style={{ size: 40, weight: "bold", color: "#111" }}
-        />
-
-        <Button
-            text="C: {count}"
-            on:click={() => count++}
-            style={{
-                bg:      "#3b82f6"
-                color:   "#fff"
-                radius:  8
-                padding: 12
-                hover:   { bg: "#2563eb" }
-            }}
-        />
+        <col>
+            <text value="Hello, Flow!" />
+            <text value="Il router funziona." />
+            <button text="Click me" />
+        </col>
     )
 }

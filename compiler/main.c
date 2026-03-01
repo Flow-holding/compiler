@@ -92,7 +92,8 @@ static void pipeline(
     bool        prod,
     bool        dev_only,
     bool        fast_only,    /* --fast: solo HTML/CSS/JS, zero compilazione */
-    bool        server_mode   /* --server: genera server.c */
+    bool        server_mode,  /* --server: genera server.c */
+    bool        outlet_only   /* --outlet: genera solo HTML interno componente */
 ) {
     clock_t start = clock();
 
@@ -202,21 +203,35 @@ static void pipeline(
     }
 
     if (has_client) {
-        char html_path[512]; snprintf(html_path, sizeof(html_path), "%s/index.html", out_dir);
-        char css_path[512];  snprintf(css_path,  sizeof(css_path),  "%s/style.css",  out_dir);
-        char js_path[512];   snprintf(js_path,   sizeof(js_path),   "%s/app.js",     out_dir);
+        if (outlet_only) {
+            // Genera solo HTML interno del componente (per iniezione in #fl-outlet)
+            char outlet_path[512];
+            snprintf(outlet_path, sizeof(outlet_path), "%s/%s.outlet.html", out_dir, stem);
+            Str outlet = codegen_outlet(&arena, ast);
+            write_file(outlet_path, outlet.data);
+            // Genera anche CSS del componente per merge
+            char rcss_path[512];
+            snprintf(rcss_path, sizeof(rcss_path), "%s/%s.route.css", out_dir, stem);
+            Str rcss = codegen_css(&arena, ast);
+            write_file(rcss_path, rcss.data);
+            printf("  outlet  %s\n", outlet_path);
+        } else {
+            char html_path[512]; snprintf(html_path, sizeof(html_path), "%s/index.html", out_dir);
+            char css_path[512];  snprintf(css_path,  sizeof(css_path),  "%s/style.css",  out_dir);
+            char js_path[512];   snprintf(js_path,   sizeof(js_path),   "%s/app.js",     out_dir);
 
-        Str html = codegen_html(&arena, ast);
-        Str css  = codegen_css(&arena,  ast);
-        Str js   = codegen_js(&arena,   ast, server_fns);
+            Str html = codegen_html(&arena, ast);
+            Str css  = codegen_css(&arena,  ast);
+            Str js   = codegen_js(&arena,   ast, server_fns);
 
-        write_file(html_path, html.data);
-        write_file(css_path,  css.data);
-        write_file(js_path,   js.data);
+            write_file(html_path, html.data);
+            write_file(css_path,  css.data);
+            write_file(js_path,   js.data);
 
-        printf("  html    %s\n", html_path);
-        printf("  css     %s\n", css_path);
-        printf("  js      %s\n", js_path);
+            printf("  html    %s\n", html_path);
+            printf("  css     %s\n", css_path);
+            printf("  js      %s\n", js_path);
+        }
     }
 
     double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC * 1000;
@@ -254,6 +269,7 @@ int main(int argc, char** argv) {
     bool        dev_only       = false;  /* --dev: solo web, salta .exe */
     bool        fast_only      = false;  /* --fast: solo HTML/CSS/JS, zero compilazione */
     bool        server_mode    = false;  /* --server: compila come server.c */
+    bool        outlet_only    = false;  /* --outlet: genera solo HTML interno del componente (per routing) */
 
     for (int i = 1; i < argc; i++) {
         if (str_eq(argv[i], "--run"))       { do_run = true; continue; }
@@ -261,6 +277,7 @@ int main(int argc, char** argv) {
         if (str_eq(argv[i], "--dev"))       { dev_only = true; continue; }
         if (str_eq(argv[i], "--fast"))      { fast_only = true; continue; }
         if (str_eq(argv[i], "--server"))    { server_mode = true; continue; }
+        if (str_eq(argv[i], "--outlet"))    { outlet_only = true; fast_only = true; continue; }
         if (str_eq(argv[i], "--outdir")     && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--runtime")    && i + 1 < argc) { runtime_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--native-map") && i + 1 < argc) { native_map_arg = argv[++i]; continue; }
@@ -301,6 +318,6 @@ int main(int argc, char** argv) {
     }
 
     pipeline(input_path, out_dir, runtime_dir, native_map_arg,
-             server_fns_arg, do_run, prod, dev_only, fast_only, server_mode);
+             server_fns_arg, do_run, prod, dev_only, fast_only, server_mode, outlet_only);
     return 0;
 }

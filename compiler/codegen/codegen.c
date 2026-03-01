@@ -600,7 +600,6 @@ Str codegen_html(Arena* a, Node* program) {
         "<!DOCTYPE html><html lang=\"it\"><head>"
         "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>Flow App</title>"
-        "<link rel=\"preload\" href=\"app.wasm\" as=\"fetch\" crossorigin fetchpriority=\"high\">"
         "<style>");
     str_cat(&out, css.data);
     str_cat(&out,
@@ -626,6 +625,27 @@ Str codegen_html(Arena* a, Node* program) {
 
     str_cat(&out,
         "</div><script async src=\"app.js\"></script></body></html>");
+    return out;
+}
+
+// Genera solo l'HTML interno del componente default — per iniezione in #fl-outlet
+Str codegen_outlet(Arena* a, Node* program) {
+    (void)a;
+    Str out = str_new();
+    for (int i = 0; i < program->children.len; i++) {
+        Node* n = (Node*)program->children.data[i];
+        if (n->kind != ND_COMPONENT_DECL) continue;
+        bool is_root = n->is_default || str_eq(n->name, "root");
+        bool is_client = n->annotation && str_eq(n->annotation->name, "client");
+        if (!is_root && !is_client) continue;
+        if (n->body) {
+            for (int j = 0; j < n->body->children.len; j++) {
+                Node* stmt = (Node*)n->body->children.data[j];
+                Node* root = (stmt->kind == ND_RETURN && stmt->left) ? stmt->left : stmt;
+                gen_ui_node(&out, root, 0);
+            }
+        }
+    }
     return out;
 }
 
@@ -667,7 +687,7 @@ Str codegen_js(Arena* a, Node* program, const char* server_fns) {
         "flow_eprint_str:ptr=>{const v=new Uint8Array(wasmMem.buffer);let e=ptr;while(v[e])e++;console.error(new TextDecoder().decode(v.subarray(ptr,e)));}"
         "}};"
         "function loadWasm(){"
-        "WebAssembly.instantiateStreaming(fetch('app.wasm?t='+Date.now()),imports)"
+        "WebAssembly.instantiateStreaming(fetch('app.wasm',{cache:'no-cache'}),imports)"
         ".then(({instance})=>{wasmMem=instance.exports.memory;window._flow=instance.exports;if(instance.exports.main)instance.exports.main();})"
         ".catch(e=>console.error('WASM error:',e));}"
         "document.readyState==='loading'?document.addEventListener('DOMContentLoaded',loadWasm):loadWasm();\n");

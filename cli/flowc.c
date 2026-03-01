@@ -67,6 +67,30 @@ int run_flowc(const char *input, const char *outdir, const char *runtime,
     return code;
 }
 
+int run_flowc_route(const char *input, const char *outdir, const char *runtime,
+                    const char *flow_stdlib) {
+    char *flowc = get_flowc();
+    if (!flowc) {
+        fprintf(stderr, C_RED "✗" C_RESET " flowc non trovato\n");
+        return 1;
+    }
+
+    const char *argv[24];
+    int i = 0;
+    argv[i++] = flowc;
+    argv[i++] = input;
+    argv[i++] = "--outdir";
+    argv[i++] = outdir;
+    argv[i++] = "--outlet";
+    if (runtime && runtime[0])         { argv[i++] = "--runtime"; argv[i++] = runtime;    }
+    if (flow_stdlib && flow_stdlib[0]) { argv[i++] = "--flow";    argv[i++] = flow_stdlib; }
+    argv[i] = NULL;
+
+    int code = run_cmd(argv);
+    free(flowc);
+    return code;
+}
+
 int run_flowc_server(const char *input, const char *outdir, const char *runtime,
                      const char *flow_stdlib, int prod) {
     char *flowc = get_flowc();

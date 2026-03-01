@@ -11,3 +11,7 @@ int run_flowc(const char *input, const char *outdir, const char *runtime,
 /* Esegue flowc in modalità server. Genera server.c + server.exe */
 int run_flowc_server(const char *input, const char *outdir, const char *runtime,
                      const char *flow_stdlib, int prod);
+
+/* Esegue flowc --outlet: genera STEM.outlet.html con solo l'HTML interno del componente */
+int run_flowc_route(const char *input, const char *outdir, const char *runtime,
+                    const char *flow_stdlib);

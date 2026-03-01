@@ -10,6 +10,10 @@ Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime
 // Genera HTML dal AST (componenti @client)
 Str codegen_html(Arena* a, Node* program);
 
+// Genera solo l'HTML interno del componente default (per iniezione in #fl-outlet)
+// Nessun shell HTML, nessun script/style — solo i nodi UI renderizzati
+Str codegen_outlet(Arena* a, Node* program);
+
 // Genera CSS dai componenti
 Str codegen_css(Arena* a, Node* program);
 

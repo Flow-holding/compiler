@@ -107,9 +107,85 @@ int cmd_build(int prod, int run_flag, int dev, int fast) {
     }
     free(srv_fns_dir);
 
-    // ── 2. Build client ───────────────────────────────────────────
+    // ── 2. Build client (root.flow → index.html / app.js / app.wasm) ────────
     code = run_flowc(entry, outdir, runtime, flow_stdlib,
                      prod, run_flag, dev, fast, srv_fns[0] ? srv_fns : NULL);
+
+    // ── 3. Compila route e inietta in #fl-outlet ──────────────────────────
+    // Scansiona client/routes/*.flow — la prima route trovata (index.flow
+    // o il primo file) viene pre-renderizzata nell'outlet per SSG-like output.
+    if (code == 0) {
+        char *routes_dir = path_join(cwd, "client" SEP "routes");
+        if (path_exists(routes_dir)) {
+            int rn = 0;
+            char **rfiles = glob_flow(routes_dir, &rn);
+            if (rfiles && rn > 0) {
+                // Preferisci index.flow, altrimenti il primo file
+                char *route_entry = NULL;
+                for (int i = 0; i < rn; i++) {
+                    const char *base = strrchr(rfiles[i], SEP[0]);
+                    if (!base) base = rfiles[i]; else base++;
+                    if (strcmp(base, "index.flow") == 0) { route_entry = rfiles[i]; break; }
+                }
+                if (!route_entry) route_entry = rfiles[0];
+
+                // Compila route → STEM.outlet.html
+                if (run_flowc_route(route_entry, outdir, runtime, flow_stdlib) == 0) {
+                    // Ricava il path dell'outlet generato
+                    const char *base = strrchr(route_entry, SEP[0]);
+                    if (!base) base = route_entry; else base++;
+                    char stem[256] = {0};
+                    strncpy(stem, base, sizeof(stem) - 1);
+                    char *dot = strrchr(stem, '.');
+                    if (dot) *dot = '\0';
+
+                    char outlet_path[4096];
+                    snprintf(outlet_path, sizeof(outlet_path),
+                             "%s" SEP "%s.outlet.html", outdir, stem);
+
+                    char *outlet_html = read_file(outlet_path);
+                    if (outlet_html) {
+                        // Leggi index.html e sostituisci placeholder outlet
+                        char main_path[4096];
+                        snprintf(main_path, sizeof(main_path), "%s" SEP "index.html", outdir);
+                        char *main_html = read_file(main_path);
+                        if (main_html) {
+                            const char *needle = "<div id=\"fl-outlet\"></div>";
+                            char *pos = strstr(main_html, needle);
+                            if (pos) {
+                                size_t prefix  = (size_t)(pos - main_html);
+                                size_t needle_len = strlen(needle);
+                                size_t outlet_len = strlen(outlet_html);
+                                size_t suffix_len = strlen(pos + needle_len);
+                                // "<div id="fl-outlet">" + outlet + "</div>"
+                                const char *open  = "<div id=\"fl-outlet\">";
+                                const char *close = "</div>";
+                                size_t new_len = prefix + strlen(open) + outlet_len
+                                                + strlen(close) + suffix_len + 1;
+                                char *new_html = (char*)malloc(new_len);
+                                if (new_html) {
+                                    memcpy(new_html, main_html, prefix);
+                                    char *p = new_html + prefix;
+                                    memcpy(p, open,        strlen(open));  p += strlen(open);
+                                    memcpy(p, outlet_html, outlet_len);    p += outlet_len;
+                                    memcpy(p, close,       strlen(close)); p += strlen(close);
+                                    memcpy(p, pos + needle_len, suffix_len + 1);
+                                    write_file(main_path, new_html);
+                                    free(new_html);
+                                }
+                            }
+                            free(main_html);
+                        }
+                        free(outlet_html);
+                    }
+                }
+
+                for (int i = 0; i < rn; i++) free(rfiles[i]);
+                free(rfiles);
+            }
+        }
+        free(routes_dir);
+    }
 
 cleanup:
     free(entry); free(outdir);
