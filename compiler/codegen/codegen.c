@@ -364,8 +364,8 @@ static void gen_top(Str* out, Node* n, CodegenTarget target) {
             // Funzione @native — solo dichiarazione
             if (n->annotation && str_eq(n->annotation->name, "native")) break;
 
-            // Attributo export per WASM (main esportato via -Wl,--export=main)
-            if (target == TARGET_WASM && !str_eq(n->name, "main"))
+            // Attributo export per WASM (un solo export "main" per evitare Duplicate export)
+            if (target == TARGET_WASM)
                 str_catf(out, "__attribute__((export_name(\"%s\")))\n", n->name);
 
             // main() deve restituire int in C

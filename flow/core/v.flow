@@ -1,0 +1,124 @@
+// flow/core/v.flow
+// Validatore built-in — disponibile ovunque, client e server.
+// Sintassi Zod-like, type-safe, eseguito sia nel browser (WASM) che nel server (C).
+
+// ── Primitivi ─────────────────────────────────────────────────────
+
+fn str(): StrSchema
+fn int(): IntSchema
+fn float(): FloatSchema
+fn bool(): BoolSchema
+
+// ── Schema stringa ────────────────────────────────────────────────
+
+StrSchema = {
+    // Vincoli
+    fn min(n: int): StrSchema
+    fn max(n: int): StrSchema
+    fn length(n: int): StrSchema
+
+    // Formati
+    fn email(): StrSchema
+    fn url(): StrSchema
+    fn uuid(): StrSchema
+    fn regex(pattern: str): StrSchema
+
+    // Trasformazioni
+    fn trim(): StrSchema
+    fn lowercase(): StrSchema
+    fn uppercase(): StrSchema
+
+    // Opzionalità
+    fn optional(): StrSchema?
+    fn default(val: str): StrSchema
+}
+
+// ── Schema numerico ───────────────────────────────────────────────
+
+IntSchema = {
+    fn min(n: int): IntSchema
+    fn max(n: int): IntSchema
+    fn positive(): IntSchema
+    fn negative(): IntSchema
+    fn optional(): IntSchema?
+    fn default(val: int): IntSchema
+}
+
+FloatSchema = {
+    fn min(n: float): FloatSchema
+    fn max(n: float): FloatSchema
+    fn optional(): FloatSchema?
+    fn default(val: float): FloatSchema
+}
+
+// ── Schema booleano ───────────────────────────────────────────────
+
+BoolSchema = {
+    fn optional(): BoolSchema?
+    fn default(val: bool): BoolSchema
+}
+
+// ── Strutture ─────────────────────────────────────────────────────
+
+fn object(shape: map): ObjectSchema
+fn array(item: Schema): ArraySchema
+fn enum(values: []str): EnumSchema
+
+ObjectSchema = {
+    fn optional(): ObjectSchema?
+    fn strict(): ObjectSchema     // rifiuta campi non dichiarati
+}
+
+ArraySchema = {
+    fn min(n: int): ArraySchema
+    fn max(n: int): ArraySchema
+    fn optional(): ArraySchema?
+}
+
+EnumSchema = {
+    fn optional(): EnumSchema?
+    fn default(val: str): EnumSchema
+}
+
+// ── Tipo union ────────────────────────────────────────────────────
+
+fn optional(schema: Schema): Schema?   // alias per schema.optional()
+fn union(schemas: []Schema): Schema    // v.union([v.str(), v.int()])
+
+// ── Uso — server ─────────────────────────────────────────────────
+//
+// export createUser = input({
+//     nome:  v.str().min(2).max(50),
+//     email: v.email(),
+//     eta:   v.int().min(0).max(150).optional(),
+//     ruolo: v.enum(["admin", "user"]).default("user")
+// }) {
+//     return db.users.create(data)
+// }
+//
+// Se la validazione fallisce → risposta automatica 422 { ok: false, errors: [...] }
+
+// ── Uso — client ──────────────────────────────────────────────────
+//
+// LoginForm() {
+//     schema = v.object({
+//         email:    v.email(),
+//         password: v.str().min(8)
+//     })
+//
+//     submit(form) {
+//         result = schema.parse(form)
+//         if (!result.ok) {
+//             errors = result.errors   // [{ field: "email", message: "Email non valida" }]
+//             return
+//         }
+//         await server.login(result.data)
+//     }
+// }
+
+// ── Parse e safeParse ─────────────────────────────────────────────
+//
+// schema.parse(data)      — lancia errore se non valido
+// schema.safeParse(data)  — { ok: true, data } oppure { ok: false, errors }
+//
+// Disponibile su tutti gli schema.

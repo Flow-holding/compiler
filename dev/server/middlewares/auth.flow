@@ -1,0 +1,8 @@
+// dev/server/middlewares/auth.flow
+
+export fn auth(ctx: Context, next: fn(Context): Response): Response {
+    if (!ctx.session) return Response.error(401, "Non autorizzato")
+    user = db.sessions.verify(ctx.session)
+    if (!user) return Response.error(401, "Sessione non valida")
+    return next(ctx.with({ user }))
+}

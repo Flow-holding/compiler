@@ -1,0 +1,39 @@
+// flow/server/context.flow
+// Definizione del Context server — gestito dal compilatore/runtime
+// Non serve importarlo, è globale in ogni server function e middleware.
+
+// ── Context base (sempre disponibile) ────────────────────────────
+
+// ctx.req       — la request HTTP grezza
+// ctx.session   — da client.shared.session (se inviato)
+// ctx.locale    — da client.shared.locale
+// ctx.timezone  — da client.shared.timezone
+
+// ── Come i middleware estendono ctx ───────────────────────────────
+
+// I middleware ricevono (ctx: Context, next: fn(Context): Response)
+// e chiamano next(ctx.with({ campo: valore })) per aggiungere campi.
+// Il compilatore inferisce il tipo di ctx nel handler in base alla chain.
+
+// Esempio — dopo .auth il handler sa che ctx.user: User esiste:
+//
+// export fn auth(ctx: Context, next: fn(Context): Response): Response {
+//     user = db.sessions.verify(ctx.session)
+//     if (!user) return Response.error(401)
+//     return next(ctx.with({ user }))
+// }
+
+// ── Metodi disponibili su ctx ─────────────────────────────────────
+
+// ctx.with({ k: v })     — ritorna nuovo ctx con campo aggiunto (usato nei middleware)
+// ctx.req.params.id      — path params (:id)
+// ctx.req.query.page     — query string (?page=2)
+// ctx.req.headers.get(k) — header HTTP
+// ctx.req.body           — body parsed (JSON)
+
+// ── Logger automatico ─────────────────────────────────────────────
+
+// Ogni server function logga automaticamente:
+//   → nomeFunzione    12ms  ✓
+//   → nomeFunzione     2ms  ✗  401 Non autorizzato
+// Non serve aggiungere codice — è iniettato dal compilatore.

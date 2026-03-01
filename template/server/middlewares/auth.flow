@@ -1,0 +1,12 @@
+// server/middlewares/auth.flow
+// Verifica il token di sessione e aggiunge ctx.user
+
+export fn auth(ctx: Context, next: fn(Context): Response): Response {
+    session = ctx.session
+    if (!session) return Response.error(401, "Non autorizzato")
+
+    user = db.sessions.verify(session)
+    if (!user) return Response.error(401, "Sessione non valida")
+
+    return next(ctx.with({ user }))
+}

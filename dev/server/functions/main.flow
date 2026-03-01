@@ -1,0 +1,11 @@
+// dev/server/functions/main.flow — sandbox server functions
+
+export ping = input() {
+    return { ok: true, locale: ctx.locale }
+}
+
+export greet = input({
+    nome: v.str().min(1)
+}) {
+    return "Ciao {data.nome} da Flow!"
+}

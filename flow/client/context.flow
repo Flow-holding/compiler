@@ -1,0 +1,53 @@
+// flow/client/context.flow
+// Definizione del Context client — gestito dal compilatore/runtime
+// Non serve importarlo, è globale nei componenti.
+
+// ── client/ctx.flow — due export ─────────────────────────────────
+
+// 1. ctx — stato UI reattivo, solo client
+//    Modificarlo ricomputa i componenti che lo usano.
+//    Non va mai al server.
+//
+//    Esempio:
+//      export ctx = {
+//          user:  null as User?,
+//          theme: "light",
+//          cart:  [] as CartItem[]
+//      }
+
+// 2. shared — inviato al server ad ogni server.xxx() call
+//    Usato come ctx base dal server prima dei middleware.
+//    Tipico: session token, locale, timezone.
+//
+//    Esempio:
+//      export shared = {
+//          session:  cookies.get("session"),
+//          locale:   navigator.language,
+//          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+//      }
+
+// ── Uso nei componenti ────────────────────────────────────────────
+
+// ctx è reattivo — cambiarlo aggiorna i componenti che lo leggono
+//
+//   ThemeToggle() {
+//       return (
+//           <button on:click={() => ctx.theme = ctx.theme == "light" ? "dark" : "light"}>
+//               {ctx.theme}
+//           </button>
+//       )
+//   }
+
+// ── Ciclo completo client → server ───────────────────────────────
+
+// 1. Componente chiama server.getMe()
+// 2. Runtime allega shared  { session, locale, timezone }  alla POST
+// 3. Server riceve ctx base = shared
+// 4. .auth legge ctx.session, verifica, aggiunge ctx.user
+// 5. Handler riceve ctx.user tipato
+// 6. Risposta arriva al client e può aggiornare ctx.user
+//
+//   login() {
+//       result = await server.loginUser({ email, password })
+//       ctx.user = result.user
+//   }

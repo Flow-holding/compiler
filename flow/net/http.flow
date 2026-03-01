@@ -1,22 +1,37 @@
+// flow/net/http.flow
+// HTTP server — gestito internamente dal runtime.
+// Non serve usarlo direttamente: usa server/routes/ per i tuoi endpoint.
+
 Request = {
-    metodo: str
-    percorso: str
-    body: str
+    method:  str    // "GET", "POST", ecc.
+    path:    str    // "/api/users"
+    query:   str    // "page=2&limit=10"
+    body:    str    // body raw (JSON string)
+    params:  map    // path params — req.params.id
 }
 
 Response = {
-    status: int
-    body: str
-    tipo: str
+    status:       int
+    content_type: str
+    body:         str
 }
 
-@native("flow_http_response")
-fn response(status: int, body: str, tipo: str): Response
+// Costruttori usati negli handler REST
+@native("flow_fn_ok")
+fn ok(json: str): Response
 
+@native("flow_fn_err")
+fn error(status: int, message: str): Response
+
+// Avvia il server sulla porta specificata con la dir degli asset
+// Chiamato dal runtime — non serve invocarlo manualmente
 @native("flow_http_serve")
-fn serve(porta: int, handler: fn(Request): Response)
+fn serve(port: int, out_dir: str)
 
-// Uso:
-// http.serve(3000, (req) {
-//     http.response(200, "ciao", "text/plain")
-// })
+// Registra una route (usato dal compilatore per @get, @post, ecc.)
+@native("flow_route")
+fn route(method: str, pattern: str, handler: fn(Request): Response)
+
+// Registra una server function (usato dal compilatore per export fn = input())
+@native("flow_fn")
+fn register_fn(name: str, handler: fn(Request): Response)

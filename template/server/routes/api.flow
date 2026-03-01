@@ -1,0 +1,29 @@
+// server/routes/api.flow
+// Endpoint REST normali — accessibili via path HTTP
+
+@get("/api/health")
+fn health(req: Request): str {
+    return "ok"
+}
+
+// @get("/api/users")
+// fn listUsers(req: Request): User[] {
+//     return db.users.findMany()
+// }
+
+// @get("/api/users/:id")
+// fn getUser(req: Request): User {
+//     return db.users.find(req.params.id)
+// }
+
+// @post("/api/users")
+// fn createUser(req: Request): User {
+//     body = req.body as CreateUserInput
+//     return db.users.create(body)
+// }
+
+// @delete("/api/users/:id")
+// @use(auth)
+// fn deleteUser(req: Request): void {
+//     db.users.delete(req.params.id)
+// }

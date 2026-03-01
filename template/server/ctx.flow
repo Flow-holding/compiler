@@ -1,0 +1,9 @@
+// server/ctx.flow — contesto base del server
+// Qui puoi aggiungere campi disponibili in ogni handler prima dei middleware.
+// I middleware estendono questo ctx con .with({ campo: valore }).
+
+// Questo file viene letto dal compilatore per tipare ctx in tutte le server functions.
+// Non serve importarlo — è automatico.
+
+// Esempio: aggiungi qui una connessione db condivisa, config, ecc.
+// export db = Database.connect(env("DATABASE_URL"))

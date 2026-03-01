@@ -1,0 +1,12 @@
+// dev/client/ctx.flow
+
+export ctx = {
+    user:  null as User?,
+    theme: "light"
+}
+
+export shared = {
+    session:  cookies.get("session"),
+    locale:   navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+}

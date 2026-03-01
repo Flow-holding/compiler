@@ -153,7 +153,7 @@ static void pipeline(
         write_file(wasm_c, wasm_code.data);
         snprintf(cmd, sizeof(cmd),
             "clang --target=wasm32-unknown-unknown -nostdlib "
-            "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export=main "
+            "-Wl,--no-entry -Wl,--allow-undefined "
             "-D_CRT_SECURE_NO_WARNINGS -w %s \"%s\" -o \"%s\"",
             prod ? "-O2" : "-O0", wasm_c, wasm_path);
         if (run_cmd(cmd) == 0) printf("  .wasm   %s\n", wasm_path);

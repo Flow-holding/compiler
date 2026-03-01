@@ -1,0 +1,46 @@
+// flow/server/functions.flow
+// API per le server functions — gestita dal compilatore
+// Tutto disponibile globalmente in server/functions/**
+
+// ── input() — punto di partenza della chain ───────────────────────
+
+// Senza schema: handler riceve solo ctx
+//   export nome = input() { ... }
+
+// Con schema Zod-like: handler riceve data tipato + ctx
+//   export nome = input({ campo: v.str() }) { ... }
+
+// ── .middlewareName — applica middleware ──────────────────────────
+
+// Ogni export fn da server/middlewares/ diventa disponibile come .nome
+//   export nome = input().auth.rateLimit { ... }
+
+// ── { } — handler finale ──────────────────────────────────────────
+
+// Il blocco chiude la chain. Ha accesso a:
+//   data  — input validato (se passato schema a input())
+//   ctx   — context base + aggiunto dai middleware
+
+// ── Chiamata dal client ───────────────────────────────────────────
+
+// server.nomeFunzione(args) — tipato, async automatico
+// Il compilatore genera lo stub che invia client.shared + args
+
+// ── v — validatore ───────────────────────────────────────────────
+
+// v è disponibile ovunque (client e server) — definito in flow/core/v.flow
+// Qui usato per validare l'input delle server functions.
+//
+// v.str()                   stringa
+// v.str().min(n).max(n)     stringa con vincoli lunghezza
+// v.int()                   intero
+// v.int().min(n).max(n)     intero con range
+// v.float()                 decimale
+// v.bool()                  booleano
+// v.email()                 email valida
+// v.url()                   URL valida
+// v.uuid()                  UUID
+// v.optional(v.str())       campo opzionale
+// v.array(v.str())          array tipato
+// v.object({ ... })         oggetto nested
+// v.enum(["a", "b", "c"])   enum di stringhe

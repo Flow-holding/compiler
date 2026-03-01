@@ -1,0 +1,6 @@
+// dev/server/routes/api.flow
+
+@get("/api/health")
+fn health(req: Request): str {
+    return "ok"
+}

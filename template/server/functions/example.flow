@@ -1,0 +1,30 @@
+// server/functions/example.flow
+// Server functions — chiamabili dal client via server.xxx()
+// Tutte POST, logger automatico, context tipato.
+
+// Senza middleware — ctx ha solo i campi di client.shared
+export getPublicData = input() {
+    return { message: "Ciao dal server", locale: ctx.locale }
+}
+
+// Con validazione input
+export greet = input({
+    nome: v.str().min(1).max(50)
+}) {
+    return "Ciao {data.nome}!"
+}
+
+// Con middleware — ctx.user disponibile dopo .auth
+export getMe = input()
+    .auth {
+        return ctx.user
+    }
+
+// Con più middleware e validazione
+export updateProfile = input({
+    nome:  v.str().min(2).max(50).optional(),
+    email: v.email().optional()
+})
+.auth {
+    return db.users.update(ctx.user.id, data)
+}

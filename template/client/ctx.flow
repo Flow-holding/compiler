@@ -1,0 +1,15 @@
+// client/ctx.flow
+
+// Stato UI reattivo — locale, non inviato al server
+export ctx = {
+    user:  null as User?,
+    theme: "light"
+}
+
+// Inviato automaticamente ad ogni server.xxx() call
+// Il server lo riceve come ctx base prima dei middleware
+export shared = {
+    session:  cookies.get("session"),
+    locale:   navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+}
