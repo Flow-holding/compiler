@@ -365,8 +365,9 @@ static void gen_top(Str* out, Node* n, CodegenTarget target) {
             // Funzione @native — solo dichiarazione
             if (n->annotation && str_eq(n->annotation->name, "native")) break;
 
-            // Attributo export per WASM (un solo export "main" per evitare Duplicate export)
-            if (target == TARGET_WASM)
+            // WASM: esporta solo le funzioni esplicitamente marcate export
+            // Evita "Duplicate export name" col runtime
+            if (target == TARGET_WASM && n->is_exported)
                 str_catf(out, "__attribute__((export_name(\"%s\")))\n", n->name);
 
             // main() deve restituire int in C
@@ -666,7 +667,7 @@ Str codegen_js(Arena* a, Node* program, const char* server_fns) {
         "flow_eprint_str:ptr=>{const v=new Uint8Array(wasmMem.buffer);let e=ptr;while(v[e])e++;console.error(new TextDecoder().decode(v.subarray(ptr,e)));}"
         "}};"
         "function loadWasm(){"
-        "WebAssembly.instantiateStreaming(fetch('app.wasm'),imports)"
+        "WebAssembly.instantiateStreaming(fetch('app.wasm?t='+Date.now()),imports)"
         ".then(({instance})=>{wasmMem=instance.exports.memory;window._flow=instance.exports;if(instance.exports.main)instance.exports.main();})"
         ".catch(e=>console.error('WASM error:',e));}"
         "document.readyState==='loading'?document.addEventListener('DOMContentLoaded',loadWasm):loadWasm();\n");

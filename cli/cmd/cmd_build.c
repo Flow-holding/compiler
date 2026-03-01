@@ -96,8 +96,10 @@ int cmd_build(int prod, int run_flag, int dev, int fast) {
 
             printf(C_FLOW "▲" C_RESET " Building server...\n");
             int srv_rc = run_flowc_server(srv_entry, outdir, runtime, flow_stdlib, prod);
-            if (srv_rc != 0)
-                fprintf(stderr, C_RED "✗" C_RESET " Server build fallita\n");
+            if (srv_rc != 0) {
+                fprintf(stderr, C_RED "⚠" C_RESET " Server build saltata (flowc aggiornato?)\n");
+                srv_fns[0] = '\0';  // non iniettare stubs se server non compilato
+            }
 
             for (int i = 0; i < srv_n; i++) free(srv_files[i]);
             free(srv_files);
