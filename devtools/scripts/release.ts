@@ -13,18 +13,18 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 
 const root = join(import.meta.dir, "../..")
 
-// 1. Aggiorna VERSION
-writeFileSync(join(root, "VERSION"), version)
-console.log(`✓ VERSION → ${version}`)
+// 1. Aggiorna cli/VERSION
+writeFileSync(join(root, "cli/VERSION"), version)
+console.log(`✓ cli/VERSION → ${version}`)
 
-// 2. Aggiorna CURRENT_VERSION in cli/update.ts
-const updatePath = join(root, "cli/update.ts")
-const updateSrc  = await Bun.file(updatePath).text()
-writeFileSync(updatePath, updateSrc.replace(
-    /export const CURRENT_VERSION = "[^"]+"/,
-    `export const CURRENT_VERSION = "${version}"`
+// 2. Aggiorna FLOW_VERSION in cli/cli.h
+const cliHPath = join(root, "cli/cli.h")
+const cliHSrc  = await Bun.file(cliHPath).text()
+writeFileSync(cliHPath, cliHSrc.replace(
+    /#define FLOW_VERSION "[^"]+"/,
+    `#define FLOW_VERSION "${version}"`
 ))
-console.log(`✓ cli/update.ts → ${version}`)
+console.log(`✓ cli/cli.h → ${version}`)
 
 // 3. Commit + tag + push
 function run(cmd: string[]) {
@@ -35,7 +35,7 @@ function run(cmd: string[]) {
     }
 }
 
-run(["git", "add", "VERSION", "cli/update.ts"])
+run(["git", "add", "cli/VERSION", "cli/cli.h"])
 run(["git", "commit", "-m", `v${version}`])
 run(["git", "tag", `v${version}`])
 run(["git", "push"])

@@ -7,26 +7,26 @@ import { readFileSync, writeFileSync } from "node:fs"
 
 const ROOT = join(import.meta.dir, "../..")
 
-// Legge versione attuale
-const versionFile = join(ROOT, "VERSION")
+// Legge versione attuale da cli/VERSION
+const versionFile = join(ROOT, "cli/VERSION")
 const current = readFileSync(versionFile, "utf8").trim()
 const parts = current.split(".").map(Number)
 parts[2]++
 const next = parts.join(".")
 
-// Aggiorna VERSION
+// Aggiorna cli/VERSION
 writeFileSync(versionFile, next)
 console.log(`\x1b[32m✓\x1b[0m Versione: ${current} → ${next}`)
 
-// Aggiorna cli/update.ts
-const updatePath = join(ROOT, "cli/update.ts")
-let updateSrc = readFileSync(updatePath, "utf8")
-updateSrc = updateSrc.replace(
-    /export const CURRENT_VERSION = "[^"]+"/,
-    `export const CURRENT_VERSION = "${next}"`
+// Aggiorna FLOW_VERSION in cli/cli.h
+const cliHPath = join(ROOT, "cli/cli.h")
+let cliHSrc = readFileSync(cliHPath, "utf8")
+cliHSrc = cliHSrc.replace(
+    /#define FLOW_VERSION "[^"]+"/,
+    `#define FLOW_VERSION "${next}"`
 )
-writeFileSync(updatePath, updateSrc)
-console.log(`\x1b[32m✓\x1b[0m cli/update.ts aggiornato`)
+writeFileSync(cliHPath, cliHSrc)
+console.log(`\x1b[32m✓\x1b[0m cli/cli.h aggiornato`)
 
 // Aggiorna devtools/package.json
 const pkgPath = join(ROOT, "devtools/package.json")
