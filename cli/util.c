@@ -185,9 +185,18 @@ char *str_replace(const char *src, const char *from, const char *to) {
 /* ── file system ──────────────────────────── */
 
 long long file_mtime(const char *path) {
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA attr;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &attr)) return -1;
+    ULARGE_INTEGER t;
+    t.LowPart  = attr.ftLastWriteTime.dwLowDateTime;
+    t.HighPart = attr.ftLastWriteTime.dwHighDateTime;
+    return (long long)(t.QuadPart / 10000LL);  /* 100ns → ms */
+#else
     struct stat st;
     if (stat(path, &st) != 0) return -1;
     return (long long)st.st_mtime * 1000LL;
+#endif
 }
 
 static void glob_recurse(const char *dir, char ***out, int *n, int *cap) {
@@ -257,7 +266,21 @@ int run_cmd(const char **argv) {
             strcat(cmd, argv[i]);
         }
     }
-    return system(cmd);
+    /* bInheritHandles=FALSE: il figlio NON eredita socket/handle del server,
+       evita i ~300ms di ritardo sulle fetch HTTP durante le build */
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+        return -1;
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 1;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return (int)exit_code;
 #else
     pid_t pid = fork();
     if (pid == 0) { execvp(argv[0], (char *const*)argv); _exit(127); }

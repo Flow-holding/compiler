@@ -88,7 +88,9 @@ static void pipeline(
     const char* runtime_dir,
     const char* native_map_path,
     bool        do_run,
-    bool        prod
+    bool        prod,
+    bool        dev_only,
+    bool        fast_only   /* --fast: solo HTML/CSS/JS, zero compilazione */
 ) {
     clock_t start = clock();
 
@@ -126,36 +128,36 @@ static void pipeline(
 
     char stem[256]; path_stem(stem, sizeof(stem), input_path);
 
-    // ── Codegen C nativo
-    char c_path[512]; snprintf(c_path, sizeof(c_path), "%s/%s.c", out_dir, stem);
-    Str c_code = codegen_c(&arena, ast, TARGET_NATIVE, runtime_dir, native_map_path);
-    write_file(c_path, c_code.data);
-
-    // ── Compila .exe
-    char exe_path[512]; snprintf(exe_path, sizeof(exe_path), "%s/%s%s", out_dir, stem, EXE_EXT);
+    int rc = 0;
+    char exe_path[512];
     char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "clang \"%s\" -o \"%s\" %s -D_CRT_SECURE_NO_WARNINGS -w",
-        c_path, exe_path, prod ? "-O2" : "-g");
-    int rc = run_cmd(cmd);
+    snprintf(exe_path, sizeof(exe_path), "%s/%s%s", out_dir, stem, EXE_EXT);
 
-    if (rc != 0) {
-        fprintf(stderr, "✗ Errore compilazione nativa\n");
-    } else {
-        printf("  .exe    %s\n", exe_path);
+    if (!fast_only && !dev_only) {
+        // ── Codegen C nativo + compila .exe
+        char c_path[512]; snprintf(c_path, sizeof(c_path), "%s/%s.c", out_dir, stem);
+        Str c_code = codegen_c(&arena, ast, TARGET_NATIVE, runtime_dir, native_map_path);
+        write_file(c_path, c_code.data);
+        snprintf(cmd, sizeof(cmd), "clang \"%s\" -o \"%s\" %s -D_CRT_SECURE_NO_WARNINGS -w",
+            c_path, exe_path, prod ? "-O2" : "-g");
+        rc = run_cmd(cmd);
+        if (rc != 0) fprintf(stderr, "✗ Errore compilazione nativa\n");
+        else printf("  .exe    %s\n", exe_path);
     }
 
-    // ── Codegen WASM
-    char wasm_c[512]; snprintf(wasm_c, sizeof(wasm_c), "%s/%s.wasm.c", out_dir, stem);
-    char wasm_path[512]; snprintf(wasm_path, sizeof(wasm_path), "%s/app.wasm", out_dir);
-    Str wasm_code = codegen_c(&arena, ast, TARGET_WASM, runtime_dir, native_map_path);
-    write_file(wasm_c, wasm_code.data);
-
-    snprintf(cmd, sizeof(cmd),
-        "clang --target=wasm32-unknown-unknown -nostdlib "
-        "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export=main "
-        "-D_CRT_SECURE_NO_WARNINGS -w %s \"%s\" -o \"%s\"",
-        prod ? "-O2" : "-O1", wasm_c, wasm_path);
-    if (run_cmd(cmd) == 0) printf("  .wasm   %s\n", wasm_path);
+    if (!fast_only) {
+        // ── Codegen WASM + compila
+        char wasm_c[512]; snprintf(wasm_c, sizeof(wasm_c), "%s/%s.wasm.c", out_dir, stem);
+        char wasm_path[512]; snprintf(wasm_path, sizeof(wasm_path), "%s/app.wasm", out_dir);
+        Str wasm_code = codegen_c(&arena, ast, TARGET_WASM, runtime_dir, native_map_path);
+        write_file(wasm_c, wasm_code.data);
+        snprintf(cmd, sizeof(cmd),
+            "clang --target=wasm32-unknown-unknown -nostdlib "
+            "-Wl,--no-entry -Wl,--allow-undefined -Wl,--export=main "
+            "-D_CRT_SECURE_NO_WARNINGS -w %s \"%s\" -o \"%s\"",
+            prod ? "-O2" : "-O0", wasm_c, wasm_path);
+        if (run_cmd(cmd) == 0) printf("  .wasm   %s\n", wasm_path);
+    }
 
     // ── HTML / CSS / JS
     bool has_client = false;
@@ -188,8 +190,8 @@ static void pipeline(
     double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC * 1000;
     printf("\n✓ Build completata in %.0fms\n\n", elapsed);
 
-    // ── Esegui se --run
-    if (do_run && rc == 0) {
+    // ── Esegui se --run (solo se abbiamo buildato .exe)
+    if (do_run && !dev_only && rc == 0) {
         printf("── output ──────────────────────────\n");
         run_cmd(exe_path);
         printf("────────────────────────────────────\n");
@@ -206,7 +208,7 @@ int main(int argc, char** argv) {
     SetConsoleOutputCP(65001);  // UTF-8
 #endif
     if (argc < 2) {
-        fprintf(stderr, "uso: flowc <file.flow> [--run] [--prod]\n");
+        fprintf(stderr, "uso: flowc <file.flow> [--run] [--prod] [--js]\n");
         return 1;
     }
 
@@ -216,10 +218,14 @@ int main(int argc, char** argv) {
     const char* native_map_arg = NULL;
     bool        do_run         = false;
     bool        prod           = false;
+    bool        dev_only       = false;  /* --dev: solo web, salta .exe */
+    bool        fast_only      = false;  /* --fast: solo HTML/CSS/JS, zero compilazione */
 
     for (int i = 1; i < argc; i++) {
         if (str_eq(argv[i], "--run"))       { do_run = true; continue; }
         if (str_eq(argv[i], "--prod"))      { prod = true;   continue; }
+        if (str_eq(argv[i], "--dev"))       { dev_only = true; continue; }
+        if (str_eq(argv[i], "--fast"))      { fast_only = true; continue; }
         if (str_eq(argv[i], "--outdir")     && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--runtime")    && i + 1 < argc) { runtime_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--native-map") && i + 1 < argc) { native_map_arg = argv[++i]; continue; }
@@ -256,6 +262,6 @@ int main(int argc, char** argv) {
 #endif
     }
 
-    pipeline(input_path, out_dir, runtime_dir, native_map_arg, do_run, prod);
+    pipeline(input_path, out_dir, runtime_dir, native_map_arg, do_run, prod, dev_only, fast_only);
     return 0;
 }

@@ -1,9 +1,10 @@
 {
   "name": "flow-language",
   "displayName": "Flow Language",
-  "description": "Syntax highlighting for the Flow programming language (.flow)",
+  "description": "Official language support for Flow — a modern, compiled language with clean syntax, native UI components, and WebAssembly output.",
   "version": "0.2.5",
   "publisher": "flow-lang",
+  "icon": "icons/flow-file.png",
   "engines": {
     "vscode": "^1.75.0"
   },

@@ -8,18 +8,18 @@ fn main() {
 
 @client
 component App() {
-    let count = state.use(0)
+    count = 0
 
     return Column {
-        style: style({ padding: 24, gap: 16 })
-
+     
         Text {
-            value: "Benvenuto in dev"
-            style: style({ size: 28, weight: "bold", color: "#111" })
+            value: "Benssskllssaaaassasssddsasaskklop"
+            style: style({ size: 40, weight: "bold", color: "#111" })
         }
 
         Button {
-            text: "Conta: {count}"
+            text: "C: {count}"
+            
             style: style({
                 bg:     "#3b82f6"
                 color:  "#fff"

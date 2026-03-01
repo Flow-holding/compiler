@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int cmd_build(int prod, int run_flag) {
+int cmd_build(int prod, int run_flag, int dev, int fast) {
     FlowConfig cfg = {0};
     if (!config_load(&cfg)) return 1;
 
@@ -24,7 +24,7 @@ int cmd_build(int prod, int run_flag) {
 
     mkdir_p(outdir);
 
-    int code = run_flowc(entry, outdir, runtime, prod, run_flag);
+    int code = run_flowc(entry, outdir, runtime, prod, run_flag, dev, fast);
 
     free(entry); free(outdir); free(runtime); free(cwd);
     config_free(&cfg);

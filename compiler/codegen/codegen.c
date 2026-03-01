@@ -521,9 +521,10 @@ Str codegen_css(Arena* a, Node* program) {
     return out;
 }
 
-// ── JS Generator ─────────────────────────────────────────────────
+// ── JS Generator (WASM loader) ───────────────────────────────────
 
 Str codegen_js(Arena* a, Node* program) {
+    (void)program;
     Str out = str_new();
     str_cat(&out,
         "let wasmMem;const imports={env:{"

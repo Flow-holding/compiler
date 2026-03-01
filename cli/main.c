@@ -15,7 +15,7 @@ static const char *HELP =
     "  flow init [nome]    Crea un nuovo progetto\n"
     "  flow run            Compila ed esegue\n"
     "  flow build          Build produzione\n"
-    "  flow dev            Server dev con watch\n"
+    "  flow dev            Server dev (WASM)\n"
     "  flow update         Aggiorna alla versione piu recente\n"
     "  flow help           Mostra questo messaggio\n"
     "\nESEMPI:\n"
@@ -38,8 +38,8 @@ int main(int argc, char **argv) {
     }
 
     if (!strcmp(cmd, "init"))   return cmd_init(argc > 2 ? argv[2] : NULL);
-    if (!strcmp(cmd, "build"))  return cmd_build(1, 0);
-    if (!strcmp(cmd, "run"))    return cmd_build(0, 1);
+    if (!strcmp(cmd, "build"))  return cmd_build(1, 0, 0, 0);
+    if (!strcmp(cmd, "run"))    return cmd_build(0, 1, 0, 0);
     if (!strcmp(cmd, "dev"))    return cmd_dev();
     if (!strcmp(cmd, "update")) return cmd_update();
 

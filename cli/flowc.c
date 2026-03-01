@@ -27,7 +27,7 @@ char *get_flowc(void) {
     return NULL;
 }
 
-int run_flowc(const char *input, const char *outdir, const char *runtime, int prod, int run_flag) {
+int run_flowc(const char *input, const char *outdir, const char *runtime, int prod, int run_flag, int dev, int fast) {
     char *flowc = get_flowc();
     if (!flowc) {
         fprintf(stderr, C_RED "✗" C_RESET " flowc non trovato"
@@ -35,7 +35,7 @@ int run_flowc(const char *input, const char *outdir, const char *runtime, int pr
         return 1;
     }
 
-    const char *argv[20];
+    const char *argv[24];
     int i = 0;
     argv[i++] = flowc;
     argv[i++] = input;
@@ -47,6 +47,8 @@ int run_flowc(const char *input, const char *outdir, const char *runtime, int pr
     }
     if (prod)     argv[i++] = "--prod";
     if (run_flag) argv[i++] = "--run";
+    if (dev)      argv[i++] = "--dev";
+    if (fast)     argv[i++] = "--fast";
     argv[i]   = NULL;
 
     int code = run_cmd(argv);

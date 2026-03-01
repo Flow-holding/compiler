@@ -10,15 +10,15 @@ $FLAGS = if ($prod) { "-O2" } else { "-g -O0" }
 Write-Host "Build compiler C..." -ForegroundColor Cyan
 
 $files = $SRC | ForEach-Object { "`"$_`"" }
-$cmd   = "clang $flags $($files -join ' ') -o $OUT"
+$cmd   = "clang $FLAGS $($files -join ' ') -o $OUT"
 
 Write-Host "  $cmd"
 Invoke-Expression $cmd
 
 if ($LASTEXITCODE -eq 0) {
     $size = [math]::Round((Get-Item $OUT).Length / 1KB)
-    Write-Host "✓ $OUT ($size KB)" -ForegroundColor Green
+    Write-Host "OK $OUT ($size KB)" -ForegroundColor Green
 } else {
-    Write-Host "✗ Build fallita" -ForegroundColor Red
+    Write-Host "Build fallita" -ForegroundColor Red
     exit 1
 }
