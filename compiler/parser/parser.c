@@ -53,10 +53,13 @@ static Node* node_new(Parser* p, NodeKind kind) {
 // ── Forward declarations ─────────────────────────────────────────
 
 static Node* parse_expr(Parser* p);
+static Node* parse_primary(Parser* p);
 static Node* parse_stmt(Parser* p);
 static Node* parse_block(Parser* p);
 static Node* parse_type(Parser* p);
 static Node* parse_top(Parser* p);
+static Node* parse_jsx(Parser* p);
+static Node* parse_style_map(Parser* p);
 
 // ── Tipi ─────────────────────────────────────────────────────────
 
@@ -64,14 +67,12 @@ static Node* parse_type(Parser* p) {
     Token* t = peek(p);
     Node*  n = node_new(p, ND_TYPE_PRIM);
 
-    // Opzionale ?T
     if (match(p, TK_QUESTION)) {
         n->kind = ND_TYPE_OPTIONAL;
         n->left = parse_type(p);
         return n;
     }
 
-    // fn(T, T): R
     if (match(p, TK_FN)) {
         n->kind = ND_TYPE_FN;
         eat(p, TK_LPAREN);
@@ -84,7 +85,6 @@ static Node* parse_type(Parser* p) {
         return n;
     }
 
-    // { K: V }
     if (match(p, TK_LBRACE)) {
         n->kind  = ND_TYPE_MAP;
         n->left  = parse_type(p);
@@ -94,7 +94,6 @@ static Node* parse_type(Parser* p) {
         return n;
     }
 
-    // Primitivi
     switch (t->kind) {
         case TK_STR_T:   n->name = "str";   advance(p); break;
         case TK_INT_T:   n->name = "int";   advance(p); break;
@@ -113,7 +112,6 @@ static Node* parse_type(Parser* p) {
             return n;
     }
 
-    // T[]
     if (match(p, TK_LBRACKET)) {
         eat(p, TK_RBRACKET);
         Node* arr  = node_new(p, ND_TYPE_ARRAY);
@@ -121,12 +119,139 @@ static Node* parse_type(Parser* p) {
         return arr;
     }
 
-    // T | err
     if (match(p, TK_PIPE)) {
         Node* u  = node_new(p, ND_TYPE_UNION);
         u->left  = n;
         u->right = parse_type(p);
         return u;
+    }
+
+    return n;
+}
+
+// ── Style map: { key: val  key: val } ────────────────────────────
+// Usato da style={{ }} nei props JSX — chiavi senza virgolette
+
+static Node* parse_style_map(Parser* p) {
+    Node* n = node_new(p, ND_LIT_MAP);
+    eat(p, TK_LBRACE);
+    while (!check(p, TK_RBRACE) && !check(p, TK_EOF)) {
+        Field* f = (Field*)arena_alloc(p->arena, sizeof(Field));
+        f->name = NULL; f->type = NULL; f->value = NULL;
+
+        Token* key = peek(p);
+        if (key->kind == TK_IDENT   || key->kind == TK_STR_T  ||
+            key->kind == TK_INT_T   || key->kind == TK_FLOAT_T ||
+            key->kind == TK_BOOL_T  || key->kind == TK_TYPE    ||
+            key->kind == TK_DEFAULT || key->kind == TK_STRING) {
+            f->name = key->val ? key->val : tk_name(key->kind);
+            advance(p);
+        } else {
+            break;
+        }
+
+        eat(p, TK_COLON);
+
+        if (check(p, TK_LBRACE)) {
+            f->value = parse_style_map(p);
+        } else {
+            f->value = parse_primary(p);
+        }
+
+        vec_push(&n->fields, f);
+        match(p, TK_COMMA);
+    }
+    eat(p, TK_RBRACE);
+    return n;
+}
+
+// ── JSX: <tag props> children </tag>  o  <tag props /> ───────────
+
+static Node* parse_jsx(Parser* p) {
+    eat(p, TK_LT);
+
+    Node* n = node_new(p, ND_UI_NODE);
+
+    Token* tag = peek(p);
+    if (tag->kind != TK_IDENT) {
+        errlist_add(p->errors, tag->line, tag->col, "nome tag JSX atteso");
+        return n;
+    }
+    n->name = tag->val;
+    advance(p);
+
+    // Props: name="val"  name={expr}  name={{style}}  on:event={fn}
+    while (!check(p, TK_GT) && !check(p, TK_SLASH_GT) && !check(p, TK_EOF)) {
+        Field* f = (Field*)arena_alloc(p->arena, sizeof(Field));
+        f->name = NULL; f->type = NULL; f->value = NULL;
+
+        // on:event o x:y — IDENT COLON IDENT
+        if (check(p, TK_IDENT) && peek2(p)->kind == TK_COLON) {
+            const char* prefix = advance(p)->val;
+            advance(p); // ':'
+            const char* suffix = (check(p, TK_IDENT)) ? advance(p)->val : "";
+            char buf[128];
+            snprintf(buf, sizeof(buf), "%s:%s", prefix, suffix);
+            f->name = str_intern(p->arena, buf, (int)strlen(buf));
+        } else if (check(p, TK_IDENT)) {
+            f->name = advance(p)->val;
+        } else {
+            advance(p);
+            continue;
+        }
+
+        if (!match(p, TK_ASSIGN)) {
+            // Prop booleana senza valore
+            vec_push(&n->style, f);
+            continue;
+        }
+
+        // Valore del prop
+        if (check(p, TK_LBRACE) && peek2(p)->kind == TK_LBRACE) {
+            // style={{ key: val ... }}
+            advance(p);                  // outer {
+            f->value = parse_style_map(p);
+            eat(p, TK_RBRACE);           // outer }
+        } else if (check(p, TK_LBRACE)) {
+            // {expr}
+            advance(p);
+            f->value = parse_expr(p);
+            eat(p, TK_RBRACE);
+        } else if (check(p, TK_STRING)) {
+            Node* s = node_new(p, ND_LIT_STRING);
+            s->value = advance(p)->val;
+            f->value = s;
+        } else {
+            f->value = parse_primary(p);
+        }
+
+        vec_push(&n->style, f);
+    }
+
+    // Self-closing />
+    if (match(p, TK_SLASH_GT)) return n;
+
+    eat(p, TK_GT);
+
+    // Figli fino a </tag>
+    while (!check(p, TK_LT_SLASH) && !check(p, TK_EOF)) {
+        if (check(p, TK_LT)) {
+            Node* child = parse_jsx(p);
+            if (child) vec_push(&n->children, child);
+        } else if (check(p, TK_LBRACE)) {
+            advance(p);
+            Node* expr = parse_expr(p);
+            eat(p, TK_RBRACE);
+            if (expr) vec_push(&n->children, expr);
+        } else {
+            advance(p); // salta testo raw (non supportato)
+        }
+    }
+
+    // Closing </tag>
+    if (match(p, TK_LT_SLASH)) {
+        if (check(p, TK_IDENT)) advance(p); // nome tag (non verifichiamo match)
+        eat(p, TK_GT);
     }
 
     return n;
@@ -146,6 +271,10 @@ static Node* parse_primary(Parser* p) {
         case TK_FALSE:  n->kind = ND_LIT_BOOL;   n->value = "false"; advance(p); return n;
         case TK_NULL:   n->kind = ND_LIT_NULL;   advance(p); return n;
 
+        // JSX element
+        case TK_LT:
+            return parse_jsx(p);
+
         case TK_LBRACKET: {
             n->kind = ND_LIT_ARRAY;
             advance(p);
@@ -162,7 +291,6 @@ static Node* parse_primary(Parser* p) {
             advance(p);
             while (!check(p, TK_RBRACE) && !check(p, TK_EOF)) {
                 Field* f   = (Field*)arena_alloc(p->arena, sizeof(Field));
-                // Accetta sia "stringa" che identificatore come chiave
                 Token* key = peek(p);
                 if (key->kind == TK_STRING || key->kind == TK_IDENT ||
                     key->kind == TK_STR_T  || key->kind == TK_INT_T  ||
@@ -198,16 +326,15 @@ static Node* parse_primary(Parser* p) {
                 eat(p, TK_RPAREN);
             }
 
-            // UI component { ... }
+            // Legacy: uppercase UINode { ... } (vecchia sintassi)
             if (check(p, TK_LBRACE) && isupper((unsigned char)n->name[0])) {
                 n->kind = ND_UI_NODE;
                 advance(p);
                 while (!check(p, TK_RBRACE) && !check(p, TK_EOF)) {
-                    // prop: value  o  ChildNode { }
                     if (check(p, TK_IDENT) && peek2(p)->kind == TK_COLON) {
                         Field* f = (Field*)arena_alloc(p->arena, sizeof(Field));
                         f->name  = advance(p)->val;
-                        advance(p);  // :
+                        advance(p);
                         f->value = parse_expr(p);
                         vec_push(&n->style, f);
                     } else {
@@ -284,7 +411,6 @@ static Node* parse_unary(Parser* p) {
     return parse_postfix(p);
 }
 
-// Precedenza operatori binari
 static int op_prec(TkKind k) {
     switch (k) {
         case TK_OR:       return 1;
@@ -320,7 +446,6 @@ static Node* parse_binary(Parser* p, int min_prec) {
 static Node* parse_expr(Parser* p) {
     Node* left = parse_binary(p, 0);
 
-    // Assegnazione
     if (match(p, TK_ASSIGN)) {
         Node* n  = node_new(p, ND_ASSIGN);
         n->left  = left;
@@ -349,8 +474,21 @@ static Node* parse_stmt(Parser* p) {
     // return
     if (match(p, TK_RETURN)) {
         Node* n = node_new(p, ND_RETURN);
-        if (!check(p, TK_RBRACE) && !check(p, TK_EOF))
+        if (match(p, TK_LPAREN)) {
+            // return ( jsx jsx ... ) — fragment implicito
+            Node* frag = node_new(p, ND_FRAGMENT);
+            while (!check(p, TK_RPAREN) && !check(p, TK_EOF)) {
+                Node* child = parse_expr(p);
+                if (child) vec_push(&frag->children, child);
+            }
+            eat(p, TK_RPAREN);
+            if (frag->children.len == 1)
+                n->left = (Node*)frag->children.data[0];
+            else
+                n->left = frag;
+        } else if (!check(p, TK_RBRACE) && !check(p, TK_EOF)) {
             n->left = parse_expr(p);
+        }
         return n;
     }
 
@@ -383,7 +521,7 @@ static Node* parse_stmt(Parser* p) {
         eat(p, TK_LBRACE);
         while (!check(p, TK_RBRACE) && !check(p, TK_EOF)) {
             Node* arm   = node_new(p, ND_MATCH_ARM);
-            arm->name   = eat(p, TK_IDENT)->val;  // pattern
+            arm->name   = eat(p, TK_IDENT)->val;
             if (match(p, TK_LPAREN)) {
                 arm->value = eat(p, TK_IDENT)->val;
                 eat(p, TK_RPAREN);
@@ -404,7 +542,7 @@ static Node* parse_stmt(Parser* p) {
         return n;
     }
 
-    // Espressione-statement
+    // Espressione-statement (incluso JSX come statement)
     Node* expr = parse_expr(p);
     Node* s    = node_new(p, ND_EXPR_STMT);
     s->left    = expr;
@@ -415,7 +553,7 @@ static Node* parse_stmt(Parser* p) {
 
 static Node* parse_annotation(Parser* p) {
     Node* n   = node_new(p, ND_ANNOTATION);
-    n->name   = peek(p)->val;  // già consumato il @ nel lexer, val è il nome
+    n->name   = peek(p)->val;
     advance(p);
     if (match(p, TK_LPAREN)) {
         if (check(p, TK_STRING)) n->value = advance(p)->val;
@@ -424,21 +562,51 @@ static Node* parse_annotation(Parser* p) {
     return n;
 }
 
+// Analizza params ( name: type, ... ) di una component/fn
+static void parse_params(Parser* p, Node* n) {
+    eat(p, TK_LPAREN);
+    while (!check(p, TK_RPAREN) && !check(p, TK_EOF)) {
+        Param* param = (Param*)arena_alloc(p->arena, sizeof(Param));
+        param->name  = eat(p, TK_IDENT)->val;
+        if (match(p, TK_COLON)) param->type = parse_type(p);
+        vec_push(&n->params, param);
+        if (!match(p, TK_COMMA)) break;
+    }
+    eat(p, TK_RPAREN);
+}
+
 static Node* parse_top(Parser* p) {
-    Node* ann = NULL;
+    Node* ann        = NULL;
+    bool  is_exported = false;
+    bool  is_default  = false;
 
     // Annotazione @nome(...)
     if (check(p, TK_AT)) {
         ann = parse_annotation(p);
     }
 
+    // export [default]
+    if (match(p, TK_EXPORT)) {
+        is_exported = true;
+        if (match(p, TK_DEFAULT)) is_default = true;
+    } else if (match(p, TK_DEFAULT)) {
+        is_default = true;
+    }
+
     Token* t = peek(p);
+
+    // import "..." — skip (non ancora implementato)
+    if (match(p, TK_IMPORT)) {
+        while (!check(p, TK_EOF) && peek(p)->line == t->line) advance(p);
+        return NULL;
+    }
 
     // fn nome(params): tipo { body }
     if (match(p, TK_FN)) {
-        Node* n      = node_new(p, ND_FN_DECL);
-        n->name      = eat(p, TK_IDENT)->val;
+        Node* n       = node_new(p, ND_FN_DECL);
+        n->name       = eat(p, TK_IDENT)->val;
         n->annotation = ann;
+        n->is_exported = is_exported;
         eat(p, TK_LPAREN);
         while (!check(p, TK_RPAREN) && !check(p, TK_EOF)) {
             Param* param  = (Param*)arena_alloc(p->arena, sizeof(Param));
@@ -457,7 +625,8 @@ static Node* parse_top(Parser* p) {
     if (match(p, TK_STRUCT)) {
         Node* n  = node_new(p, ND_STRUCT_DECL);
         n->name  = eat(p, TK_IDENT)->val;
-        n->annotation = ann;
+        n->annotation  = ann;
+        n->is_exported = is_exported;
         eat(p, TK_LBRACE);
         while (!check(p, TK_RBRACE) && !check(p, TK_EOF)) {
             Field* f = (Field*)arena_alloc(p->arena, sizeof(Field));
@@ -472,30 +641,48 @@ static Node* parse_top(Parser* p) {
         return n;
     }
 
-    // component Nome(props) { body }
+    // component Nome(props) { body } — sintassi legacy
     if (match(p, TK_COMPONENT)) {
-        Node* n  = node_new(p, ND_COMPONENT_DECL);
-        n->name  = eat(p, TK_IDENT)->val;
+        Node* n       = node_new(p, ND_COMPONENT_DECL);
+        n->name       = eat(p, TK_IDENT)->val;
         n->annotation = ann;
-        if (match(p, TK_LPAREN)) {
-            while (!check(p, TK_RPAREN) && !check(p, TK_EOF)) {
-                Param* param  = (Param*)arena_alloc(p->arena, sizeof(Param));
-                param->name   = eat(p, TK_IDENT)->val;
-                if (match(p, TK_COLON)) param->type = parse_type(p);
-                vec_push(&n->params, param);
-                if (!match(p, TK_COMMA)) break;
-            }
-            eat(p, TK_RPAREN);
-        }
+        n->is_exported = is_exported;
+        n->is_default  = is_default;
+        if (check(p, TK_LPAREN)) parse_params(p, n);
         n->body = parse_block(p);
+        return n;
+    }
+
+    // Nome(params) { body } — nuova sintassi: maiuscolo = componente
+    if (t->kind == TK_IDENT && isupper((unsigned char)t->val[0]) && peek2(p)->kind == TK_LPAREN) {
+        Node* n       = node_new(p, ND_COMPONENT_DECL);
+        n->name       = advance(p)->val;
+        n->annotation = ann;
+        n->is_exported = is_exported;
+        n->is_default  = is_default;
+        parse_params(p, n);
+        n->body = parse_block(p);
+        return n;
+    }
+
+    // JSX a livello top-level (root.flow: <App />)
+    if (check(p, TK_LT)) {
+        Node* n       = node_new(p, ND_COMPONENT_DECL);
+        n->name       = "root";
+        n->is_default = true;
+        n->body       = node_new(p, ND_BLOCK);
+        Node* ret     = node_new(p, ND_RETURN);
+        ret->left     = parse_jsx(p);
+        vec_push(&n->body->children, ret);
         return n;
     }
 
     // Variabile globale
     if (t->kind == TK_IDENT) {
-        Node* n = node_new(p, ND_VAR_DECL);
-        n->name = advance(p)->val;
-        n->annotation = ann;
+        Node* n        = node_new(p, ND_VAR_DECL);
+        n->name        = advance(p)->val;
+        n->annotation  = ann;
+        n->is_exported = is_exported;
         if (match(p, TK_COLON)) n->type = parse_type(p);
         if (match(p, TK_ASSIGN)) n->left = parse_expr(p);
         return n;

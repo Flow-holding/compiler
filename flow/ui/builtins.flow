@@ -1,0 +1,110 @@
+// flow/ui/builtins.flow
+// Definizione dei componenti built-in di Flow UI
+// Questi sono gestiti direttamente dal compilatore — non sono implementati in Flow.
+// I nomi sono minuscoli per distinguerli dai componenti utente (maiuscoli).
+
+// ── Layout ────────────────────────────────────────────────────────
+
+// col — contenitore verticale (flex-direction: column)
+// <col style={{ gap: 16, padding: 24 }}>
+//     ...children
+// </col>
+@builtin("fl-col")
+col(style: Style)
+
+// row — contenitore orizzontale (flex-direction: row)
+// <row style={{ gap: 8, align: "center" }}>
+//     ...children
+// </row>
+@builtin("fl-row")
+row(style: Style)
+
+// stack — sovrapposizione (position: relative)
+// <stack style={{ width: 200, height: 200 }}>
+//     ...children
+// </stack>
+@builtin("fl-stack")
+stack(style: Style)
+
+// scroll — area scrollabile
+// <scroll style={{ height: 400 }}>
+//     ...children
+// </scroll>
+@builtin("fl-scroll")
+scroll(style: Style)
+
+// grid — CSS grid
+// <grid style={{ cols: 3, gap: 16 }}>
+//     ...children
+// </grid>
+@builtin("fl-grid")
+grid(style: Style)
+
+// ── Contenuto ─────────────────────────────────────────────────────
+
+// text — testo (<p>)
+// <text value="Ciao {nome}" style={{ size: 16, weight: "bold", color: "#111" }} />
+@builtin("text")
+text(value: str, style: Style)
+
+// button — pulsante (<button>)
+// <button text="Clicca" on:click={() => count++} style={{ bg: "#3b82f6" }} />
+@builtin("button")
+button(text: str, on:click: fn(), style: Style)
+
+// input — campo di testo (<input>)
+// <input placeholder="Scrivi..." on:input={(e) => val = e.value} style={{ ... }} />
+@builtin("input")
+input(placeholder: str, value: str, on:input: fn(), style: Style)
+
+// img — immagine (<img>)
+// <img src="/logo.png" alt="Logo" style={{ width: 120 }} />
+@builtin("img")
+img(src: str, alt: str, style: Style)
+
+// link — link di navigazione (<a>)
+// <link href="/about" text="About" style={{ color: "#3b82f6" }} />
+@builtin("link")
+link(href: str, text: str, style: Style)
+
+// ── Control flow (stile SolidJS) ──────────────────────────────────
+
+// show — renderizza i figli solo quando when è truthy
+// <show when={count > 0}>
+//     <text value="Visibile!" />
+// </show>
+@builtin("show")
+show(when: bool)
+
+// switch + match — switch/case dichiarativo
+// <switch value={status}>
+//     <match when="loading">
+//         <text value="Caricamento..." />
+//     </match>
+//     <match when="error">
+//         <text value="Errore!" />
+//     </match>
+//     <match>
+//         <text value="Default" />
+//     </match>
+// </switch>
+@builtin("switch")
+switch(value: any)
+
+@builtin("match")
+match(when: str)
+
+// each — lista reattiva (come <For> in SolidJS)
+// <each items={lista} as={item}>
+//     <text value="{item.nome}" />
+// </each>
+@builtin("each")
+each(items: any[], as: str)
+
+// ── Routing ───────────────────────────────────────────────────────
+
+// App — outlet del router (usato in root.flow)
+// <App />   →   <div id="fl-outlet"></div>
+// Il compilatore inietta qui il componente della route attiva.
+@builtin("App")
+App()

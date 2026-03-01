@@ -57,6 +57,7 @@ typedef enum {
     ND_UI_NODE,
     ND_STYLE_PROP,
     ND_STYLE_BLOCK,
+    ND_FRAGMENT,     // fragment implicito — più figli senza wrapper
 } NodeKind;
 
 typedef struct Node Node;
@@ -101,6 +102,7 @@ struct Node {
 
     // Flags
     bool   is_exported;
+    bool   is_default;
 };
 
 // ── Parser ───────────────────────────────────────────────────────

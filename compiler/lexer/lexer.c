@@ -28,6 +28,9 @@ static TkKind keyword(const char* s, int len) {
     KW("null",      TK_NULL);
     KW("as",        TK_AS);
     KW("type",      TK_TYPE);
+    KW("default",   TK_DEFAULT);
+    KW("export",    TK_EXPORT);
+    KW("import",    TK_IMPORT);
     KW("str",       TK_STR_T);
     KW("int",       TK_INT_T);
     KW("float",     TK_FLOAT_T);
@@ -127,6 +130,10 @@ TokenList lex(Arena* a, const char* src, ErrorList* errors) {
             PUSH(k, val);
             continue;
         }
+
+        // JSX multi-char: /> e </
+        if (c == '/' && PEEK2() == '>') { ADV(); ADV(); PUSH(TK_SLASH_GT, NULL); continue; }
+        if (c == '<' && PEEK2() == '/') { ADV(); ADV(); PUSH(TK_LT_SLASH, NULL); continue; }
 
         // Operatori multi-char
         if (c == '?' && PEEK2() == '.') { ADV(); ADV(); PUSH(TK_QUEST_DOT, NULL); continue; }

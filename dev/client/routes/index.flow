@@ -7,6 +7,7 @@ default Home() {
             value="Benssskllssaaaassasssddsasaskklop"
             style={{ size: 40, weight: "bold", color: "#111" }}
         />
+        
         <Button
             text="C: {count}"
             on:click={() => count++}

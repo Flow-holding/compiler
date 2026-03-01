@@ -438,10 +438,96 @@ Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime
 
 static int html_compact = 1;  // minify: no indent/newlines
 
-static void gen_ui_node(Str* html, Node* n, int ind) {
-    if (!n || n->kind != ND_UI_NODE) return;
+// Dichiara prima di gen_ui_node (mutual recursion)
+static void gen_ui_node(Str* html, Node* n, int ind);
 
-    /* <App /> — router outlet: il JS popola questo div con la route attiva */
+static void gen_show(Str* html, Node* n, int ind) {
+    const char* when_expr = "false";
+    for (int i = 0; i < n->style.len; i++) {
+        Field* f = (Field*)n->style.data[i];
+        if (str_eq(f->name, "when") && f->value)
+            when_expr = f->value->value ? f->value->value :
+                        f->value->name  ? f->value->name  : "false";
+    }
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_catf(html, "<div data-fl-show=\"%s\">%s", when_expr, html_compact ? "" : "\n");
+    for (int i = 0; i < n->children.len; i++)
+        gen_ui_node(html, (Node*)n->children.data[i], ind + 1);
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_cat(html, html_compact ? "</div>" : "</div>\n");
+}
+
+static void gen_switch_flow(Str* html, Node* n, int ind) {
+    const char* val_expr = "";
+    for (int i = 0; i < n->style.len; i++) {
+        Field* f = (Field*)n->style.data[i];
+        if (str_eq(f->name, "value") && f->value)
+            val_expr = f->value->value ? f->value->value :
+                       f->value->name  ? f->value->name  : "";
+    }
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_catf(html, "<div data-fl-switch=\"%s\">%s", val_expr, html_compact ? "" : "\n");
+    for (int i = 0; i < n->children.len; i++) {
+        Node* child = (Node*)n->children.data[i];
+        if (child->kind == ND_UI_NODE && str_eq(child->name, "match")) {
+            const char* when_val = "";
+            bool is_default_arm = true;
+            for (int j = 0; j < child->style.len; j++) {
+                Field* f = (Field*)child->style.data[j];
+                if (str_eq(f->name, "when") && f->value) {
+                    when_val = f->value->value ? f->value->value : "";
+                    is_default_arm = false;
+                }
+            }
+            if (!html_compact) { for (int k = 0; k < ind + 1; k++) str_cat(html, "  "); }
+            if (is_default_arm)
+                str_catf(html, "<div data-fl-match-default>%s", html_compact ? "" : "\n");
+            else
+                str_catf(html, "<div data-fl-match=\"%s\">%s", when_val, html_compact ? "" : "\n");
+            for (int j = 0; j < child->children.len; j++)
+                gen_ui_node(html, (Node*)child->children.data[j], ind + 2);
+            if (!html_compact) { for (int k = 0; k < ind + 1; k++) str_cat(html, "  "); }
+            str_cat(html, html_compact ? "</div>" : "</div>\n");
+        }
+    }
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_cat(html, html_compact ? "</div>" : "</div>\n");
+}
+
+static void gen_each(Str* html, Node* n, int ind) {
+    const char* items_expr = "";
+    const char* as_name    = "item";
+    for (int i = 0; i < n->style.len; i++) {
+        Field* f = (Field*)n->style.data[i];
+        if (str_eq(f->name, "items") && f->value)
+            items_expr = f->value->value ? f->value->value :
+                         f->value->name  ? f->value->name  : "";
+        if (str_eq(f->name, "as") && f->value)
+            as_name = f->value->value ? f->value->value :
+                      f->value->name  ? f->value->name  : "item";
+    }
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_catf(html, "<template data-fl-each=\"%s\" data-fl-as=\"%s\">%s",
+             items_expr, as_name, html_compact ? "" : "\n");
+    for (int i = 0; i < n->children.len; i++)
+        gen_ui_node(html, (Node*)n->children.data[i], ind + 1);
+    if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+    str_cat(html, html_compact ? "</template>" : "</template>\n");
+}
+
+static void gen_ui_node(Str* html, Node* n, int ind) {
+    if (!n) return;
+
+    // Fragment: renderizza tutti i figli direttamente
+    if (n->kind == ND_FRAGMENT) {
+        for (int i = 0; i < n->children.len; i++)
+            gen_ui_node(html, (Node*)n->children.data[i], ind);
+        return;
+    }
+
+    if (n->kind != ND_UI_NODE) return;
+
+    /* <App /> — router outlet */
     if (str_eq(n->name, "App")) {
         if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
         str_cat(html, "<div id=\"fl-outlet\"></div>");
@@ -449,24 +535,44 @@ static void gen_ui_node(Str* html, Node* n, int ind) {
         return;
     }
 
-    const char* tag = "div";
-    if      (str_eq(n->name, "Text"))   tag = "p";
-    else if (str_eq(n->name, "Button")) tag = "button";
-    else if (str_eq(n->name, "Input"))  tag = "input";
-    else if (str_eq(n->name, "Image"))  tag = "img";
-    else if (str_eq(n->name, "Row"))    tag = "div";
-    else if (str_eq(n->name, "Column")) tag = "div";
+    /* Control flow built-ins */
+    if (str_eq(n->name, "show"))   { gen_show(html, n, ind);        return; }
+    if (str_eq(n->name, "switch")) { gen_switch_flow(html, n, ind); return; }
+    if (str_eq(n->name, "each"))   { gen_each(html, n, ind);        return; }
+
+    /* Mappatura tag — minuscolo (nuova sintassi) + maiuscolo (legacy) */
+    const char* tag      = "div";
+    const char* fl_class = NULL;
+    if      (str_eq(n->name, "text")   || str_eq(n->name, "Text"))   tag = "p";
+    else if (str_eq(n->name, "button") || str_eq(n->name, "Button")) tag = "button";
+    else if (str_eq(n->name, "input")  || str_eq(n->name, "Input"))  tag = "input";
+    else if (str_eq(n->name, "img")    || str_eq(n->name, "Image"))  tag = "img";
+    else if (str_eq(n->name, "link"))                                 tag = "a";
+    else if (str_eq(n->name, "col"))    { tag = "div"; fl_class = "fl-col";    }
+    else if (str_eq(n->name, "row"))    { tag = "div"; fl_class = "fl-row";    }
+    else if (str_eq(n->name, "stack"))  { tag = "div"; fl_class = "fl-stack";  }
+    else if (str_eq(n->name, "scroll")) { tag = "div"; fl_class = "fl-scroll"; }
+    else if (str_eq(n->name, "grid"))   { tag = "div"; fl_class = "fl-grid";   }
+    else if (str_eq(n->name, "Row")    || str_eq(n->name, "Column")) tag = "div";
 
     if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
     str_catf(html, "<%s", tag);
+    if (fl_class) str_catf(html, " class=\"%s\"", fl_class);
 
     for (int i = 0; i < n->style.len; i++) {
         Field* f = (Field*)n->style.data[i];
-        if (str_eq(f->name, "text") && f->value) continue;
+        if (str_eq(f->name, "text") || str_eq(f->name, "value") ||
+            str_eq(f->name, "style")) continue;
         if (str_eq(f->name, "src") && f->value)
             str_catf(html, " src=\"%s\"", f->value->value ? f->value->value : "");
         else if (str_eq(f->name, "placeholder") && f->value)
             str_catf(html, " placeholder=\"%s\"", f->value->value ? f->value->value : "");
+        else if (f->name && f->name[0] == 'o' && f->name[1] == 'n' && f->name[2] == ':') {
+            // on:event={handler} → data-fl-on-event="code"
+            char attr[64];
+            snprintf(attr, sizeof(attr), " data-fl-on-%s", f->name + 3);
+            str_cat(html, attr);
+        }
     }
     str_cat(html, html_compact ? ">" : ">\n");
 
@@ -500,14 +606,18 @@ Str codegen_html(Arena* a, Node* program) {
 
     for (int i = 0; i < program->children.len; i++) {
         Node* n = (Node*)program->children.data[i];
-        if (n->kind == ND_COMPONENT_DECL && n->annotation &&
-            str_eq(n->annotation->name, "client")) {
-            if (n->body) {
-                for (int j = 0; j < n->body->children.len; j++) {
-                    Node* stmt = (Node*)n->body->children.data[j];
-                    Node* root = (stmt->kind == ND_RETURN && stmt->left) ? stmt->left : stmt;
-                    gen_ui_node(&out, root, 2);
-                }
+        if (n->kind != ND_COMPONENT_DECL) continue;
+
+        /* Renderizza solo componenti default/root o con @client (legacy) */
+        bool is_root = n->is_default || str_eq(n->name, "root");
+        bool is_client = n->annotation && str_eq(n->annotation->name, "client");
+        if (!is_root && !is_client) continue;
+
+        if (n->body) {
+            for (int j = 0; j < n->body->children.len; j++) {
+                Node* stmt = (Node*)n->body->children.data[j];
+                Node* root = (stmt->kind == ND_RETURN && stmt->left) ? stmt->left : stmt;
+                gen_ui_node(&out, root, 2);
             }
         }
     }
@@ -520,12 +630,24 @@ Str codegen_html(Arena* a, Node* program) {
 // ── CSS Generator ────────────────────────────────────────────────
 
 Str codegen_css(Arena* a, Node* program) {
+    (void)program;
     Str out = str_new();
     str_cat(&out,
-        "*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:#fff}"
-        "#root{display:flex;flex-direction:column;min-height:100vh;padding:24px;gap:16px}"
-        "#root p{font-size:28px;font-weight:bold;color:#111}"
-        "#root button{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:12px;cursor:pointer}");
+        /* Reset */
+        "*{box-sizing:border-box;margin:0;padding:0}"
+        "body{font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#111}"
+        "#root{display:flex;flex-direction:column;min-height:100vh}"
+        /* Layout built-ins */
+        ".fl-col{display:flex;flex-direction:column}"
+        ".fl-row{display:flex;flex-direction:row;align-items:center}"
+        ".fl-stack{position:relative}"
+        ".fl-scroll{overflow:auto}"
+        ".fl-grid{display:grid}"
+        /* Control flow — nascosti di default, il JS runtime li mostra */
+        "[data-fl-show]{display:none}"
+        "[data-fl-match]{display:none}"
+        "[data-fl-match-default]{display:none}"
+    );
     return out;
 }
 

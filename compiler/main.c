@@ -163,8 +163,8 @@ static void pipeline(
     bool has_client = false;
     for (int i = 0; i < ast->children.len; i++) {
         Node* n = (Node*)ast->children.data[i];
-        if (n->kind == ND_COMPONENT_DECL && n->annotation &&
-            str_eq(n->annotation->name, "client")) {
+        /* Qualsiasi component decl (con o senza @client) → file web */
+        if (n->kind == ND_COMPONENT_DECL || n->kind == ND_UI_NODE) {
             has_client = true; break;
         }
     }

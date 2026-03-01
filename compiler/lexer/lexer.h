@@ -9,6 +9,7 @@ typedef enum {
     TK_FN, TK_IF, TK_ELSE, TK_FOR, TK_IN, TK_RETURN,
     TK_MATCH, TK_STRUCT, TK_COMPONENT, TK_TRUE, TK_FALSE,
     TK_NULL, TK_AS, TK_TYPE,
+    TK_DEFAULT, TK_EXPORT, TK_IMPORT,
 
     // Tipi primitivi
     TK_STR_T, TK_INT_T, TK_FLOAT_T, TK_BOOL_T, TK_VOID, TK_ANY,
@@ -29,6 +30,8 @@ typedef enum {
     TK_AT,            // @
     TK_HASH,          // #
     TK_PIPE_GT,       // |>
+    TK_SLASH_GT,      // />
+    TK_LT_SLASH,      // </
 
     // Delimitatori
     TK_LPAREN, TK_RPAREN,
