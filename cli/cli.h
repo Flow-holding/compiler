@@ -1,6 +1,6 @@
 #pragma once
 
-#define FLOW_VERSION "0.3.19"
+#define FLOW_VERSION "0.3.20"
 #define FLOW_REPO    "Flow-holding/compiler"
 
 #define C_RED     "\x1b[31m"
