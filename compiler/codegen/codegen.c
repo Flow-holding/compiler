@@ -441,6 +441,14 @@ static int html_compact = 1;  // minify: no indent/newlines
 static void gen_ui_node(Str* html, Node* n, int ind) {
     if (!n || n->kind != ND_UI_NODE) return;
 
+    /* <App /> — router outlet: il JS popola questo div con la route attiva */
+    if (str_eq(n->name, "App")) {
+        if (!html_compact) { for (int i = 0; i < ind; i++) str_cat(html, "  "); }
+        str_cat(html, "<div id=\"fl-outlet\"></div>");
+        str_cat(html, html_compact ? "" : "\n");
+        return;
+    }
+
     const char* tag = "div";
     if      (str_eq(n->name, "Text"))   tag = "p";
     else if (str_eq(n->name, "Button")) tag = "button";

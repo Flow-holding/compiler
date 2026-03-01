@@ -1,3 +1,1 @@
-// dev — sandbox per provare modifiche a flow/, runtime/, compiler/
-// Esegui da qui: flow dev
-import "./root.css"
+<App />
