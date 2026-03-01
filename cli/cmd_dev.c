@@ -21,6 +21,7 @@
 #else
   #include <sys/socket.h>
   #include <netinet/in.h>
+  #include <netinet/tcp.h>
   #include <arpa/inet.h>
   #include <unistd.h>
   #include <pthread.h>
@@ -294,21 +295,21 @@ int cmd_dev(void) {
     if (neturl[0] == '\0') snprintf(neturl, sizeof(neturl), "http://localhost:3000");
 
     {
-        /* Banner stile Flow: angoli stondati, Flow OS centrato, riga unica */
-        #define W 58
-        #define TL "\xE2\x95\xAD"
-        #define TR "\xE2\x95\xAE"
-        #define BL "\xE2\x95\xB0"
-        #define BR "\xE2\x95\xAF"
-        #define HZ "\xE2\x94\x80"
-        #define VT "\xE2\x94\x82"
-        #define DM "\xE2\x97\x86"
+        /* Banner stile Flow OS: angoli stondati, rombi ◆, colore #ff0087 */
+        #define W 60
+        #define TL "\xE2\x95\xAD"  /* ╭ */
+        #define TR "\xE2\x95\xAE"  /* ╮ */
+        #define BL "\xE2\x95\xB0"  /* ╰ */
+        #define BR "\xE2\x95\xAF"  /* ╯ */
+        #define HZ "\xE2\x94\x80"  /* ─ */
+        #define VT "\xE2\x94\x82"  /* │ */
+        #define DM "\xE2\x97\x86"  /* ◆ */
         int half = (W - 10) / 2, rest = W - half - 10;
         printf("\n  " C_FLOW TL C_RESET);
         for (int i = 0; i < half; i++) printf(C_FLOW HZ C_RESET);
-        printf(C_FLOW " Flow OS " C_RESET);
+        printf(C_FLOW " Flow dev " C_RESET);
         for (int i = 0; i < rest; i++) printf(C_FLOW HZ C_RESET);
-        printf(C_FLOW TR "\n  " VT C_RESET "  " C_FLOW DM C_RESET " Local:   " C_FLOW "http://localhost:3000" C_RESET "\n  " VT C_RESET "  " C_FLOW DM C_RESET " Network: " C_FLOW "%-24s" C_RESET C_FLOW " " VT "\n  " BL C_RESET, neturl);
+        printf(C_FLOW TR "\n  " VT C_RESET "  " C_FLOW DM C_RESET " Local:   " C_FLOW "http://localhost:3000" C_RESET "  " C_FLOW VT C_RESET "\n  " C_FLOW VT C_RESET "  " C_FLOW DM C_RESET " Network: " C_FLOW "%-28s" C_RESET "  " C_FLOW VT C_RESET "\n  " C_FLOW BL C_RESET, neturl);
         for (int i = 0; i < W; i++) printf(C_FLOW HZ C_RESET);
         printf(C_FLOW BR "\n\n" C_RESET);
         #undef W
