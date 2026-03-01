@@ -1,0 +1,72 @@
+// flow/server/db.flow
+// Database client — disponibile nelle server functions
+// Sintassi ispirata a Prisma/Drizzle
+
+// Configurazione — letta da env("DATABASE_URL")
+// Non serve configurare: il runtime trova DATABASE_URL automaticamente
+
+// ── Record generico ───────────────────────────────────────────────
+
+Record = {
+    id:        str
+    createdAt: str
+    updatedAt: str
+}
+
+// ── Client principale ─────────────────────────────────────────────
+
+DB = {
+    // Esegue una query SQL raw
+    fn query(sql: str, params: any[]): any[]
+
+    // Esegue un comando SQL (INSERT/UPDATE/DELETE)
+    fn exec(sql: str, params: any[]): int
+
+    // Inizia una transazione
+    fn transaction(fn(): void): void
+}
+
+// Globale db — inizializzato dal runtime con DATABASE_URL
+// Non serve dichiararlo: è sempre disponibile nelle server functions
+
+// ── TableClient<T> — pattern per ogni tabella ────────────────────
+// Generato automaticamente dalle struct annotate con @table
+
+TableClient = {
+    fn findMany(where: any?): any[]
+    fn findOne(where: any): any?
+    fn findById(id: str): any?
+    fn create(data: any): any
+    fn update(id: str, data: any): any
+    fn delete(id: str): bool
+    fn count(where: any?): int
+}
+
+// ── Uso ───────────────────────────────────────────────────────────
+//
+// // Definisci una tabella con annotazione @table
+// @table
+// User = {
+//     id:    str
+//     nome:  str
+//     email: str
+//     ruolo: str = "user"
+// }
+//
+// // Il compiler genera automaticamente db.users (TableClient<User>)
+//
+// export getUsers = input()
+//     .auth {
+//         return db.users.findMany()
+//     }
+//
+// export createUser = input({
+//     nome:  v.str().min(2),
+//     email: v.email()
+// })
+// .auth {
+//     return db.users.create({
+//         ...data,
+//         createdBy: ctx.user.id
+//     })
+// }

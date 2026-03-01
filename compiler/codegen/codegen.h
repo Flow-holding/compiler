@@ -13,5 +13,11 @@ Str codegen_html(Arena* a, Node* program);
 // Genera CSS dai componenti
 Str codegen_css(Arena* a, Node* program);
 
-// Genera JS glue per WASM
-Str codegen_js(Arena* a, Node* program);
+// Genera JS glue per WASM + stubs server.xxx() se server_fns != NULL
+// server_fns: stringa "nome1,nome2,..." oppure NULL
+Str codegen_js(Arena* a, Node* program, const char* server_fns);
+
+// Genera C per il server (server functions + REST routes + main HTTP)
+// runtime_dir: path al folder runtime/
+// port: porta su cui gira il server (default 3001)
+Str codegen_server_c(Arena* a, Node* program, const char* runtime_dir, int port);

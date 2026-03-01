@@ -1,0 +1,44 @@
+// flow/server/middleware.flow
+// Come scrivere middleware per le server functions
+
+// Un middleware è una fn esportata in server/middlewares/<nome>.flow
+// Firma: fn <nome>(ctx: Context, next: fn(Context): Response): Response
+//
+// Uso nella chain:
+//   export getUsers = input().auth.rateLimit { ... }
+//
+// Il compilatore chiama i middleware nell'ordine della chain,
+// passando ctx da uno all'altro.
+
+// ── ctx.with() ────────────────────────────────────────────────────
+// I middleware aggiungono campi al context con ctx.with({ ... })
+// Il compilatore inferisce il tipo finale di ctx nel handler.
+
+// Esempio — auth middleware:
+//
+// export fn auth(ctx: Context, next: fn(Context): Response): Response {
+//     if (!ctx.session) return Response.error(401, "Non autorizzato")
+//     user = db.sessions.findOne({ token: ctx.session })
+//     if (!user) return Response.error(403, "Sessione scaduta")
+//     return next(ctx.with({ user }))
+// }
+//
+// Dopo .auth, il handler sa che ctx.user: User esiste.
+
+// Esempio — rateLimit middleware:
+//
+// export fn rateLimit(ctx: Context, next: fn(Context): Response): Response {
+//     key = "rate:{ctx.session}:{ctx.req.path}"
+//     count = cache.incr(key, ttl: 60)
+//     if (count > 100) return Response.error(429, "Troppe richieste")
+//     return next(ctx)
+// }
+
+// ── Response helpers ──────────────────────────────────────────────
+
+Response = {
+    fn error(status: int, message: str): Response
+    fn ok(data: any): Response
+    fn redirect(url: str): Response
+    fn json(data: any): Response
+}

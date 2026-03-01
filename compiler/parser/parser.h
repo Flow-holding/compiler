@@ -58,6 +58,10 @@ typedef enum {
     ND_STYLE_PROP,
     ND_STYLE_BLOCK,
     ND_FRAGMENT,     // fragment implicito — più figli senza wrapper
+
+    // Server
+    ND_SERVER_FN,    // export xxx = input({schema}).mw1.mw2 { body }
+    ND_REST_ROUTE,   // @get/@post fn xxx(req): type { body }
 } NodeKind;
 
 typedef struct Node Node;
@@ -94,11 +98,12 @@ struct Node {
     Node*  annotation;  // @native("...") ecc.
 
     // Liste
-    Vec    children;    // body di blocchi, argomenti, ecc.
-    Vec    params;      // parametri funzione (Param*)
-    Vec    fields;      // campi struct (Field*)
-    Vec    arms;        // match arms
-    Vec    style;       // style props (Field*)
+    Vec    children;      // body di blocchi, argomenti, ecc.
+    Vec    params;        // parametri funzione (Param*)
+    Vec    fields;        // campi struct (Field*)
+    Vec    arms;          // match arms
+    Vec    style;         // style props (Field*)
+    Vec    middlewares;   // middleware chain (const char* names)
 
     // Flags
     bool   is_exported;

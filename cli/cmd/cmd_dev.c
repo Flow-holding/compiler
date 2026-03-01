@@ -33,9 +33,10 @@
   #define sleep_ms(ms)     usleep((ms)*1000)
 #endif
 
-static volatile int g_running = 1;
+static volatile int g_running    = 1;
 static char         g_outdir[4096];
-static wv_handle_t  g_wv = NULL;
+static wv_handle_t  g_wv         = NULL;
+static int          g_srv_port   = 3001;  // porta server process
 
 static void handle_sigint(int sig) { (void)sig; g_running = 0; }
 
@@ -125,6 +126,66 @@ static void hmr_update(void) {
     free(js);
 }
 
+/* ── Proxy: inoltra la richiesta a localhost:g_srv_port ────────────────── */
+
+static void proxy_to_server(sock_t client, const char *raw_req, int raw_len) {
+    sock_t srv = socket(AF_INET, SOCK_STREAM, 0);
+    if (srv == SOCK_BAD) {
+        const char *err = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 11\r\nConnection: close\r\n\r\nBad Gateway";
+        sock_send(client, err, (int)strlen(err));
+        return;
+    }
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port   = htons((uint16_t)g_srv_port);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    if (connect(srv, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        sock_close(srv);
+        const char *err = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 19\r\nConnection: close\r\n\r\nServer not running";
+        sock_send(client, err, (int)strlen(err));
+        return;
+    }
+
+    sock_send(srv, raw_req, raw_len);
+
+    char buf[65536];
+    int n;
+    while ((n = (int)sock_recv(srv, buf, sizeof(buf))) > 0)
+        sock_send(client, buf, n);
+
+    sock_close(srv);
+}
+
+/* ── Avvia server.exe in background ────────────────────────────────────── */
+
+static void spawn_server(const char *outdir) {
+    char srv_exe[4096];
+    snprintf(srv_exe, sizeof(srv_exe), "%s" SEP "server" EXE_EXT, outdir);
+    if (!path_exists(srv_exe)) return;
+
+    char port_str[16];
+    snprintf(port_str, sizeof(port_str), "%d", g_srv_port);
+
+#ifdef _WIN32
+    STARTUPINFOA si = {0};
+    PROCESS_INFORMATION pi = {0};
+    si.cb = sizeof(si);
+    char cmd[8192];
+    snprintf(cmd, sizeof(cmd), "\"%s\" %s \"%s\"", srv_exe, port_str, outdir);
+    CreateProcessA(NULL, cmd, NULL, NULL, FALSE,
+                   CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+#else
+    if (fork() == 0) {
+        execl(srv_exe, srv_exe, port_str, outdir, NULL);
+        _exit(1);
+    }
+#endif
+    sleep_ms(300);  // lascia il tempo al server di avviarsi
+}
+
 /* ── HTTP server (serve out/) ──────────────────────────────────────────── */
 
 static const char *mime_of(const char *ext) {
@@ -151,6 +212,15 @@ static void serve_client(sock_t client) {
     if (sscanf(req, "%7s %2047s", method, urlpath) != 2) {
         sock_close(client); return;
     }
+
+    // Proxy: /_flow/fn/* e /api/* → server process
+    if (strncmp(urlpath, "/_flow/fn/", 10) == 0 ||
+        strncmp(urlpath, "/api/", 5) == 0) {
+        proxy_to_server(client, req, total);
+        sock_close(client);
+        return;
+    }
+
     char *q = strchr(urlpath, '?');
     if (q) *q = '\0';
     if (strcmp(urlpath, "/") == 0) strcpy(urlpath, "/index.html");
@@ -291,6 +361,9 @@ int cmd_dev(void) {
         free(srcdir); free(outdir); free(cwd); config_free(&cfg);
         return 1;
     }
+
+    // Avvia server.exe se esiste
+    spawn_server(outdir);
 #ifdef _WIN32
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);

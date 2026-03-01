@@ -87,10 +87,12 @@ static void pipeline(
     const char* out_dir,
     const char* runtime_dir,
     const char* native_map_path,
+    const char* server_fns,   /* nomi funzioni server per stubs JS */
     bool        do_run,
     bool        prod,
     bool        dev_only,
-    bool        fast_only   /* --fast: solo HTML/CSS/JS, zero compilazione */
+    bool        fast_only,    /* --fast: solo HTML/CSS/JS, zero compilazione */
+    bool        server_mode   /* --server: genera server.c */
 ) {
     clock_t start = clock();
 
@@ -169,6 +171,36 @@ static void pipeline(
         }
     }
 
+    // ── Server mode: genera server.c e server.exe ───────────────
+    if (server_mode) {
+        char srv_c[512]; snprintf(srv_c, sizeof(srv_c), "%s/server.c", out_dir);
+        Str srv = codegen_server_c(&arena, ast, runtime_dir, 3001);
+        write_file(srv_c, srv.data);
+        printf("  server.c  %s\n", srv_c);
+
+        char srv_exe[512]; snprintf(srv_exe, sizeof(srv_exe), "%s/server%s", out_dir, EXE_EXT);
+        char srv_cmd[1024];
+        #ifdef _WIN32
+        snprintf(srv_cmd, sizeof(srv_cmd),
+            "clang \"%s\" -o \"%s\" %s -D_CRT_SECURE_NO_WARNINGS -w -lws2_32",
+            srv_c, srv_exe, prod ? "-O2" : "-g");
+        #else
+        snprintf(srv_cmd, sizeof(srv_cmd),
+            "clang \"%s\" -o \"%s\" %s -D_CRT_SECURE_NO_WARNINGS -w",
+            srv_c, srv_exe, prod ? "-O2" : "-g");
+        #endif
+        if (run_cmd(srv_cmd) == 0)
+            printf("  server%s  %s\n", EXE_EXT, srv_exe);
+        else
+            fprintf(stderr, "✗ Errore compilazione server\n");
+
+        double elapsed = (double)(clock() - start) / CLOCKS_PER_SEC * 1000;
+        printf("\n✓ Build server completata in %.0fms\n\n", elapsed);
+        arena_free(&arena);
+        free(source);
+        return;
+    }
+
     if (has_client) {
         char html_path[512]; snprintf(html_path, sizeof(html_path), "%s/index.html", out_dir);
         char css_path[512];  snprintf(css_path,  sizeof(css_path),  "%s/style.css",  out_dir);
@@ -176,7 +208,7 @@ static void pipeline(
 
         Str html = codegen_html(&arena, ast);
         Str css  = codegen_css(&arena,  ast);
-        Str js   = codegen_js(&arena,   ast);
+        Str js   = codegen_js(&arena,   ast, server_fns);
 
         write_file(html_path, html.data);
         write_file(css_path,  css.data);
@@ -216,19 +248,25 @@ int main(int argc, char** argv) {
     const char* out_dir_arg    = NULL;
     const char* runtime_arg    = NULL;
     const char* native_map_arg = NULL;
+    const char* server_fns_arg = NULL;  // "--server-fns=fn1,fn2" — stubs JS
     bool        do_run         = false;
     bool        prod           = false;
     bool        dev_only       = false;  /* --dev: solo web, salta .exe */
     bool        fast_only      = false;  /* --fast: solo HTML/CSS/JS, zero compilazione */
+    bool        server_mode    = false;  /* --server: compila come server.c */
 
     for (int i = 1; i < argc; i++) {
         if (str_eq(argv[i], "--run"))       { do_run = true; continue; }
         if (str_eq(argv[i], "--prod"))      { prod = true;   continue; }
         if (str_eq(argv[i], "--dev"))       { dev_only = true; continue; }
         if (str_eq(argv[i], "--fast"))      { fast_only = true; continue; }
+        if (str_eq(argv[i], "--server"))    { server_mode = true; continue; }
         if (str_eq(argv[i], "--outdir")     && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--runtime")    && i + 1 < argc) { runtime_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--native-map") && i + 1 < argc) { native_map_arg = argv[++i]; continue; }
+        if (str_eq(argv[i], "--server-fns") && i + 1 < argc) { server_fns_arg = argv[++i]; continue; }
+        // --server-fns=xxx,yyy forma inline
+        if (strncmp(argv[i], "--server-fns=", 13) == 0) { server_fns_arg = argv[i] + 13; continue; }
         if (!input_path) input_path = argv[i];
     }
 
@@ -262,6 +300,7 @@ int main(int argc, char** argv) {
 #endif
     }
 
-    pipeline(input_path, out_dir, runtime_dir, native_map_arg, do_run, prod, dev_only, fast_only);
+    pipeline(input_path, out_dir, runtime_dir, native_map_arg,
+             server_fns_arg, do_run, prod, dev_only, fast_only, server_mode);
     return 0;
 }

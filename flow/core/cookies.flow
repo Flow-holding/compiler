@@ -1,0 +1,29 @@
+// flow/core/cookies.flow
+// Cookie API — disponibile lato client (browser)
+
+// Legge un cookie per nome. Null se non esiste.
+@native("flow_cookie_get")
+fn get(name: str): str?
+
+// Imposta un cookie
+@native("flow_cookie_set")
+fn set(name: str, value: str, options: CookieOptions?): void
+
+// Rimuove un cookie
+@native("flow_cookie_remove")
+fn remove(name: str): void
+
+CookieOptions = {
+    expires:  int?    // giorni dalla creazione
+    path:     str?    // default "/"
+    secure:   bool?   // solo HTTPS
+    sameSite: str?    // "Strict" | "Lax" | "None"
+    httpOnly: bool?   // non accessibile da JS (solo server)
+}
+
+// Uso in client/ctx.flow:
+//
+// export shared = {
+//     session: cookies.get("session"),
+//     locale:  navigator.language
+// }

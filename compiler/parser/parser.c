@@ -42,12 +42,19 @@ static Node* node_new(Parser* p, NodeKind kind) {
     Node* n  = (Node*)arena_alloc(p->arena, sizeof(Node));
     n->kind  = kind;
     n->line  = peek(p)->line;
-    n->children = vec_new();
-    n->params   = vec_new();
-    n->fields   = vec_new();
-    n->arms     = vec_new();
-    n->style    = vec_new();
+    n->children  = vec_new();
+    n->params    = vec_new();
+    n->fields    = vec_new();
+    n->arms      = vec_new();
+    n->style     = vec_new();
+    n->middlewares = vec_new();
     return n;
+}
+
+static Token* peekn(Parser* p, int offset) {
+    int idx = p->pos + offset;
+    if (idx >= p->tokens.len) idx = p->tokens.len - 1;
+    return &p->tokens.data[idx];
 }
 
 // ── Forward declarations ─────────────────────────────────────────
@@ -602,8 +609,13 @@ static Node* parse_top(Parser* p) {
     }
 
     // fn nome(params): tipo { body }
+    // Se annotato con @get/@post/@put/@delete → REST route
     if (match(p, TK_FN)) {
-        Node* n       = node_new(p, ND_FN_DECL);
+        bool is_rest = ann && (str_eq(ann->name, "get")    || str_eq(ann->name, "post") ||
+                               str_eq(ann->name, "put")    || str_eq(ann->name, "delete") ||
+                               str_eq(ann->name, "patch")  || str_eq(ann->name, "ws") ||
+                               str_eq(ann->name, "sse"));
+        Node* n       = node_new(p, is_rest ? ND_REST_ROUTE : ND_FN_DECL);
         n->name       = eat(p, TK_IDENT)->val;
         n->annotation = ann;
         n->is_exported = is_exported;
@@ -663,6 +675,43 @@ static Node* parse_top(Parser* p) {
         parse_params(p, n);
         n->body = parse_block(p);
         return n;
+    }
+
+    // Server function: export name = input({schema?}).mw1.mw2 { body }
+    // Detect: TK_IDENT TK_ASSIGN "input" TK_LPAREN
+    if (is_exported && t->kind == TK_IDENT && peek2(p)->kind == TK_ASSIGN) {
+        Token* after_assign = peekn(p, 2);
+        if (after_assign->kind == TK_IDENT && str_eq(after_assign->val, "input")) {
+            Node* n       = node_new(p, ND_SERVER_FN);
+            n->name       = advance(p)->val;  // consume name
+            n->annotation = ann;
+            n->is_exported = is_exported;
+            advance(p);  // consume =
+            advance(p);  // consume "input"
+
+            eat(p, TK_LPAREN);
+            if (!check(p, TK_RPAREN)) {
+                if (check(p, TK_LBRACE)) {
+                    n->left = parse_style_map(p);  // schema object
+                } else {
+                    n->left = parse_expr(p);
+                }
+            }
+            eat(p, TK_RPAREN);
+
+            // Middleware chain: .auth .rateLimit etc.
+            while (check(p, TK_DOT)) {
+                advance(p);  // consume .
+                if (check(p, TK_IDENT)) {
+                    vec_push(&n->middlewares, (void*)advance(p)->val);
+                }
+            }
+
+            if (check(p, TK_LBRACE))
+                n->body = parse_block(p);
+
+            return n;
+        }
     }
 
     // JSX a livello top-level (root.flow: <App />)

@@ -1,4 +1,5 @@
 #include "codegen.h"
+#include <ctype.h>
 
 // ── Tabella native bindings (stdlib Flow → C) ───────────────────
 // Corrisponde alle dichiarazioni @native nei file flow/core/*.flow
@@ -651,19 +652,398 @@ Str codegen_css(Arena* a, Node* program) {
     return out;
 }
 
-// ── JS Generator (WASM loader) ───────────────────────────────────
+// ── JS Generator (WASM loader + server stubs) ───────────────────
 
-Str codegen_js(Arena* a, Node* program) {
-    (void)program;
+Str codegen_js(Arena* a, Node* program, const char* server_fns) {
+    (void)a;
     Str out = str_new();
+
+    // ── WASM loader ───────────────────────────────────────────────
     str_cat(&out,
-        "let wasmMem;const imports={env:{"
+        "let wasmMem;"
+        "const imports={env:{"
         "flow_print_str:ptr=>{const v=new Uint8Array(wasmMem.buffer);let e=ptr;while(v[e])e++;console.log(new TextDecoder().decode(v.subarray(ptr,e)));},"
         "flow_eprint_str:ptr=>{const v=new Uint8Array(wasmMem.buffer);let e=ptr;while(v[e])e++;console.error(new TextDecoder().decode(v.subarray(ptr,e)));}"
         "}};"
-        "function loadWasm(){WebAssembly.instantiateStreaming(fetch('app.wasm'),imports)"
+        "function loadWasm(){"
+        "WebAssembly.instantiateStreaming(fetch('app.wasm'),imports)"
         ".then(({instance})=>{wasmMem=instance.exports.memory;window._flow=instance.exports;if(instance.exports.main)instance.exports.main();})"
         ".catch(e=>console.error('WASM error:',e));}"
-        "document.readyState==='loading'?document.addEventListener('DOMContentLoaded',loadWasm):loadWasm();");
+        "document.readyState==='loading'?document.addEventListener('DOMContentLoaded',loadWasm):loadWasm();\n");
+
+    // ── ctx.shared helper ─────────────────────────────────────────
+    str_cat(&out,
+        "function _flowShared(){"
+        "return(typeof _flowCtxShared==='function')?_flowCtxShared():{};"
+        "}\n");
+
+    // ── Server stubs: server.xxx(data) → POST /_flow/fn/xxx ──────
+    // Collect names: from server_fns arg AND from AST ND_SERVER_FN nodes
+    Str fn_names = str_new();
+    int fn_count = 0;
+
+    // From server_fns CLI arg (comma-separated)
+    if (server_fns && server_fns[0]) {
+        char buf[4096];
+        strncpy(buf, server_fns, sizeof(buf) - 1);
+        char* tok = strtok(buf, ",");
+        while (tok) {
+            while (*tok == ' ') tok++;
+            if (*tok && fn_count > 0) str_cat(&fn_names, ",");
+            if (*tok) { str_cat(&fn_names, tok); fn_count++; }
+            tok = strtok(NULL, ",");
+        }
+    }
+
+    // From AST (server functions declared in same file)
+    for (int i = 0; i < program->children.len; i++) {
+        Node* n = (Node*)program->children.data[i];
+        if (n->kind != ND_SERVER_FN) continue;
+        if (fn_count > 0) str_cat(&fn_names, ",");
+        str_cat(&fn_names, n->name);
+        fn_count++;
+    }
+
+    if (fn_count > 0) {
+        str_cat(&out, "const server={");
+        // Re-parse fn_names to emit each stub
+        char buf2[4096];
+        strncpy(buf2, fn_names.data, sizeof(buf2) - 1);
+        char* tok = strtok(buf2, ",");
+        int first = 1;
+        while (tok) {
+            while (*tok == ' ') tok++;
+            if (!*tok) { tok = strtok(NULL, ","); continue; }
+            if (!first) str_cat(&out, ",");
+            first = 0;
+            str_catf(&out,
+                "%s:async(data={})=>{"
+                "const r=await fetch('/_flow/fn/%s',{"
+                "method:'POST',"
+                "headers:{'Content-Type':'application/json'},"
+                "body:JSON.stringify({shared:_flowShared(),data})"
+                "});"
+                "const j=await r.json();"
+                "if(!j.ok)throw new Error(j.error||'server error');"
+                "return j.data;"
+                "}",
+                tok, tok);
+            tok = strtok(NULL, ",");
+        }
+        str_cat(&out, "};\n");
+        free(fn_names.data);
+    }
+
+    return out;
+}
+
+// ── Server Codegen ───────────────────────────────────────────────
+// Genera un server.c con:
+//  - tutti gli ND_SERVER_FN come handler HTTP
+//  - tutti gli ND_REST_ROUTE come handler REST
+//  - flow_register_all() + main()
+
+static void gen_server_expr(Str* out, Node* n);
+
+// Converte un'espressione in una stringa JSON C-escaped
+// Per letterali, produce la stringa direttamente.
+// Per espressioni dinamiche, usa flow_json helpers.
+static void gen_json_expr(Str* out, Node* n) {
+    if (!n) { str_cat(out, "\"null\""); return; }
+    switch (n->kind) {
+        case ND_LIT_STRING: {
+            char buf[1024];
+            snprintf(buf, sizeof(buf), "flow_json_str(\"%s\")", n->value ? n->value : "");
+            str_cat(out, buf);
+            break;
+        }
+        case ND_LIT_INT: {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "flow_json_int(%s)", n->value ? n->value : "0");
+            str_cat(out, buf);
+            break;
+        }
+        case ND_LIT_BOOL: {
+            str_cat(out, str_eq(n->value, "true") ? "\"true\"" : "\"false\"");
+            break;
+        }
+        case ND_LIT_NULL:
+            str_cat(out, "\"null\"");
+            break;
+        case ND_LIT_MAP: {
+            // { k: v, ... } → dynamic JSON builder
+            str_cat(out, "flow_json_obj_begin()");
+            for (int i = 0; i < n->fields.len; i++) {
+                Field* f = (Field*)n->fields.data[i];
+                str_catf(out, ",\"%s\",", f->name ? f->name : "");
+                gen_json_expr(out, f->value);
+            }
+            str_cat(out, ",NULL)");
+            break;
+        }
+        default:
+            // Espressione dinamica — genera C e wrappa in flow_json_any
+            str_cat(out, "flow_json_from(");
+            gen_server_expr(out, n);
+            str_cat(out, ")");
+            break;
+    }
+}
+
+static void gen_server_expr(Str* out, Node* n) {
+    if (!n) return;
+    switch (n->kind) {
+        case ND_LIT_STRING:
+            str_catf(out, "\"%s\"", n->value ? n->value : "");
+            break;
+        case ND_LIT_INT:
+        case ND_LIT_FLOAT:
+            str_cat(out, n->value ? n->value : "0");
+            break;
+        case ND_LIT_BOOL:
+            str_cat(out, str_eq(n->value, "true") ? "1" : "0");
+            break;
+        case ND_LIT_NULL:
+            str_cat(out, "NULL");
+            break;
+        case ND_IDENT:
+            str_cat(out, n->name);
+            break;
+        case ND_MEMBER:
+            gen_server_expr(out, n->left);
+            str_cat(out, ".");
+            str_cat(out, n->name);
+            break;
+        case ND_CALL:
+            if (n->left) {
+                gen_server_expr(out, n->left);
+                str_cat(out, ".");
+            }
+            str_cat(out, n->name ? n->name : "");
+            str_cat(out, "(");
+            for (int i = 0; i < n->children.len; i++) {
+                if (i > 0) str_cat(out, ", ");
+                gen_server_expr(out, (Node*)n->children.data[i]);
+            }
+            str_cat(out, ")");
+            break;
+        case ND_BINARY: {
+            str_cat(out, "(");
+            gen_server_expr(out, n->left);
+            str_catf(out, " %s ", n->op ? n->op : "?");
+            gen_server_expr(out, n->right);
+            str_cat(out, ")");
+            break;
+        }
+        case ND_ASSIGN:
+            gen_server_expr(out, n->left);
+            str_cat(out, " = ");
+            gen_server_expr(out, n->right);
+            break;
+        default:
+            str_cat(out, "/* expr */");
+    }
+}
+
+static void gen_server_stmt(Str* out, Node* n, int ind);
+
+static void gen_server_block(Str* out, Node* block, int ind) {
+    if (!block) return;
+    for (int i = 0; i < block->children.len; i++)
+        gen_server_stmt(out, (Node*)block->children.data[i], ind);
+}
+
+static void gen_server_stmt(Str* out, Node* n, int ind) {
+    if (!n) return;
+    char pad[64] = {0};
+    for (int i = 0; i < ind && i < 15; i++) strcat(pad, "    ");
+
+    switch (n->kind) {
+        case ND_RETURN: {
+            // return val → _srv_res = flow_fn_ok(json_of(val)); goto _done;
+            str_catf(out, "%s_srv_res = flow_fn_ok(", pad);
+            gen_json_expr(out, n->left);
+            str_cat(out, ");\n");
+            str_catf(out, "%sgoto _srv_done;\n", pad);
+            break;
+        }
+        case ND_VAR_DECL: {
+            str_catf(out, "%sconst char* %s", pad, n->name);
+            if (n->left) {
+                str_cat(out, " = ");
+                gen_server_expr(out, n->left);
+            } else {
+                str_cat(out, " = NULL");
+            }
+            str_cat(out, ";\n");
+            break;
+        }
+        case ND_EXPR_STMT: {
+            str_cat(out, pad);
+            gen_server_expr(out, n->left);
+            str_cat(out, ";\n");
+            break;
+        }
+        case ND_IF: {
+            str_catf(out, "%sif (", pad);
+            gen_server_expr(out, n->cond);
+            str_cat(out, ") {\n");
+            gen_server_block(out, n->body, ind + 1);
+            str_catf(out, "%s}", pad);
+            if (n->else_body) {
+                str_cat(out, " else {\n");
+                gen_server_block(out, n->else_body, ind + 1);
+                str_catf(out, "%s}", pad);
+            }
+            str_cat(out, "\n");
+            break;
+        }
+        case ND_BLOCK:
+            gen_server_block(out, n, ind);
+            break;
+        default:
+            str_catf(out, "%s/* stmt */\n", pad);
+    }
+}
+
+// Genera la dichiarazione di un handler per una server function
+static void gen_server_fn_handler(Str* out, Node* n) {
+    str_catf(out, "FlowRes* flow_fn_%s(FlowReq *req) {\n", n->name);
+    str_cat(out,  "    FLOW_FN_LOG_START();\n");
+    str_cat(out,  "    FlowCtx ctx = flow_ctx_from_req(req);\n");
+
+    // Estrai data fields dallo schema (n->left = schema map)
+    if (n->left && n->left->kind == ND_LIT_MAP) {
+        for (int i = 0; i < n->left->fields.len; i++) {
+            Field* f = (Field*)n->left->fields.data[i];
+            str_catf(out,
+                "    char _data_%s[1024]={0}; "
+                "flow_json_extract(req->body, \"data\", \"%s\", _data_%s, sizeof(_data_%s));\n",
+                f->name, f->name, f->name, f->name);
+        }
+        // Crea struct data con puntatori ai campi
+        str_cat(out, "    struct { ");
+        for (int i = 0; i < n->left->fields.len; i++) {
+            Field* f = (Field*)n->left->fields.data[i];
+            str_catf(out, "const char* %s; ", f->name);
+        }
+        str_cat(out, "} data = { ");
+        for (int i = 0; i < n->left->fields.len; i++) {
+            Field* f = (Field*)n->left->fields.data[i];
+            if (i > 0) str_cat(out, ", ");
+            str_catf(out, "._data_%s = _data_%s", f->name, f->name);
+        }
+        str_cat(out, " };\n");
+    }
+
+    str_cat(out, "    FlowRes* _srv_res = NULL;\n");
+
+    // Middleware chain
+    for (int i = 0; i < n->middlewares.len; i++) {
+        const char* mw = (const char*)n->middlewares.data[i];
+        str_catf(out,
+            "    if (!flow_mw_%s(&ctx, req)) {\n"
+            "        FLOW_FN_LOG_END(\"%s\", 401);\n"
+            "        return flow_fn_err(401, \"Unauthorized\");\n"
+            "    }\n",
+            mw, n->name);
+    }
+
+    // Body
+    if (n->body) gen_server_block(out, n->body, 1);
+
+    str_cat(out, "_srv_done:;\n");
+    str_cat(out, "    if (!_srv_res) _srv_res = flow_fn_ok(\"null\");\n");
+    str_catf(out, "    FLOW_FN_LOG_END(\"%s\", _srv_res->status);\n", n->name);
+    str_cat(out, "    return _srv_res;\n");
+    str_cat(out, "}\n\n");
+}
+
+// Genera handler per REST route (@get/@post fn)
+static void gen_rest_route_handler(Str* out, Node* n) {
+    str_catf(out, "FlowRes* flow_route_%s(FlowReq *req) {\n", n->name);
+    str_cat(out, "    FlowRes* _srv_res = NULL;\n");
+    if (n->body) gen_server_block(out, n->body, 1);
+    str_cat(out, "_srv_done:;\n");
+    str_cat(out, "    if (!_srv_res) _srv_res = flow_fn_ok(\"null\");\n");
+    str_cat(out, "    return _srv_res;\n");
+    str_cat(out, "}\n\n");
+}
+
+Str codegen_server_c(Arena* a, Node* program, const char* runtime_dir, int port) {
+    (void)a;
+    Str out = str_new();
+    char rt[512];
+    snprintf(rt, sizeof(rt), "%s", runtime_dir ? runtime_dir : "../../runtime");
+    for (int i = 0; rt[i]; i++) if (rt[i] == '\\') rt[i] = '/';
+
+    // Includes
+    str_catf(&out, "#include \"%s/server/functions.c\"\n", rt);
+    str_catf(&out, "#include \"%s/server/json.c\"\n\n", rt);
+
+    // Forward declarations per middleware
+    for (int i = 0; i < program->children.len; i++) {
+        Node* n = (Node*)program->children.data[i];
+        if (n->kind != ND_SERVER_FN) continue;
+        for (int j = 0; j < n->middlewares.len; j++) {
+            const char* mw = (const char*)n->middlewares.data[j];
+            str_catf(&out, "static int flow_mw_%s(FlowCtx *ctx, FlowReq *req);\n", mw);
+        }
+    }
+    str_cat(&out, "\n");
+
+    // Handler functions
+    for (int i = 0; i < program->children.len; i++) {
+        Node* n = (Node*)program->children.data[i];
+        if (n->kind == ND_SERVER_FN)   gen_server_fn_handler(&out, n);
+        if (n->kind == ND_REST_ROUTE)  gen_rest_route_handler(&out, n);
+    }
+
+    // Stub middleware (passthrough) per quelli non definiti nel file
+    for (int i = 0; i < program->children.len; i++) {
+        Node* n = (Node*)program->children.data[i];
+        if (n->kind != ND_SERVER_FN) continue;
+        for (int j = 0; j < n->middlewares.len; j++) {
+            const char* mw = (const char*)n->middlewares.data[j];
+            // Stub: passa sempre (implementazione reale sarà in server/middlewares/)
+            str_catf(&out,
+                "static int flow_mw_%s(FlowCtx *ctx, FlowReq *req) {\n"
+                "    (void)req;\n"
+                "    return 1; /* TODO: implement %s middleware */\n"
+                "}\n\n",
+                mw, mw);
+        }
+    }
+
+    // flow_register_all
+    str_cat(&out, "static void flow_register_all(void) {\n");
+    for (int i = 0; i < program->children.len; i++) {
+        Node* n = (Node*)program->children.data[i];
+        if (n->kind == ND_SERVER_FN)
+            str_catf(&out, "    flow_fn(\"%s\", flow_fn_%s);\n", n->name, n->name);
+        if (n->kind == ND_REST_ROUTE && n->annotation) {
+            // method da annotazione (@get → "GET")
+            char method[16];
+            strncpy(method, n->annotation->name, sizeof(method) - 1);
+            for (int k = 0; method[k]; k++) method[k] = (char)toupper((unsigned char)method[k]);
+            const char* path = n->annotation->value ? n->annotation->value : "/";
+            str_catf(&out, "    flow_route(\"%s\", \"%s\", flow_route_%s);\n",
+                     method, path, n->name);
+        }
+    }
+    str_cat(&out, "}\n\n");
+
+    // main
+    str_catf(&out,
+        "int main(int argc, char** argv) {\n"
+        "    int port = %d;\n"
+        "    if (argc > 1) port = atoi(argv[1]);\n"
+        "    flow_register_all();\n"
+        "    const char *out_dir = argc > 2 ? argv[2] : \".\";\n"
+        "    flow_http_serve(port, out_dir);\n"
+        "    return 0;\n"
+        "}\n",
+        port > 0 ? port : 3001);
+
     return out;
 }
