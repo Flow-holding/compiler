@@ -24,3 +24,6 @@ devtools/bun.lock
 
 # Cartelle locali di test
 examples/out/
+
+# Dipendenza webview (clonata localmente, non tracciata)
+cli/deps/webview-tmp/
