@@ -3,11 +3,11 @@ default Home() {
 
     return (
         
-        <Text
+        <text
             value="Benssskllssaaaassasssddsasaskklop"
             style={{ size: 40, weight: "bold", color: "#111" }}
         />
-        
+
         <Button
             text="C: {count}"
             on:click={() => count++}
