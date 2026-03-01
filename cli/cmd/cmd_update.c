@@ -156,14 +156,14 @@ int cmd_update(void) {
             const char *mv1[] = { "move", "/y", tmp, destnew, NULL };
             run_cmd(mv1);
             char *bat_src = str_fmt(
-                "@echo off\r\ntimeout /t 1 /nobreak >nul\r\n"
+                "@echo off\r\ntimeout /t 2 /nobreak >nul\r\n"
                 "move /y \"%s\" \"%s\"\r\ndel \"%%~f0\"\r\n",
                 destnew, dest);
             write_file(bat, bat_src);
             free(bat_src);
-            const char *bat_argv[] = { "cmd", "/c", "start", "/min", bat, NULL };
+            const char *bat_argv[] = { "cmd", "/c", "start", "/wait", "/min", bat, NULL };
             run_cmd(bat_argv);
-            printf(" " C_GREEN "✓" C_RESET " (attiva al prossimo avvio)\n");
+            printf(" " C_GREEN "✓" C_RESET "\n");
             free(dest); free(destnew); free(bat);
         } else {
             char *dest = str_fmt("%s\\%s%s", exe_dir, tools[i], ASSET_EXT);
@@ -188,7 +188,7 @@ int cmd_update(void) {
 
     if (errors == 0) {
 #ifdef _WIN32
-        printf(C_GREEN "✓" C_RESET " Aggiornamento completato — riapri il terminale\n");
+        printf(C_GREEN "✓" C_RESET " Aggiornamento completato — puoi usare flow subito\n");
 #else
         printf(C_GREEN "✓" C_RESET " flow e flowc aggiornati a v%s\n", version);
 #endif
