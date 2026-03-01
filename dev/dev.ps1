@@ -16,4 +16,4 @@ Push-Location $cliDir; & .\build.ps1; Pop-Location
 Push-Location $compDir; & .\build.ps1; Pop-Location
 Copy-Item (Join-Path $cliDir "flow.exe") (Join-Path $PSScriptRoot "flow.exe") -Force
 Copy-Item (Join-Path $compDir "flowc.exe") (Join-Path $PSScriptRoot "flowc.exe") -Force -ErrorAction SilentlyContinue
-Push-Location $PSScriptRoot; & .\flow.exe dev; Pop-Location
+Push-Location $PSScriptRoot; & .\flow.exe dev --runtime ..\runtime --flow ..\flow; Pop-Location
