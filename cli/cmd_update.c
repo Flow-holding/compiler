@@ -130,12 +130,13 @@ int cmd_update(void) {
     /* Scarica un asset e installalo */
     int errors = 0;
     const char *tools[] = { "flow", "flowc", NULL };
+    const char *base = "https://github.com/" FLOW_REPO "/releases/download";
     for (int i = 0; tools[i]; i++) {
         char *asset = str_fmt("%s-%s-%s%s", tools[i], PLATFORM, ARCH, ASSET_EXT);
         char *url   = find_asset_url(json, asset);
         if (!url) {
-            fprintf(stderr, C_YELLOW "⚠" C_RESET "  asset non trovato: %s\n", asset);
-            free(asset); errors++; continue;
+            /* Fallback: URL diretto (pattern standard GitHub releases) */
+            url = str_fmt("%s/v%s/%s", base, version, asset);
         }
         printf("Download " C_CYAN "%s" C_RESET "...", asset);
         fflush(stdout);
