@@ -1,0 +1,9 @@
+{
+    "files.exclude": {
+        "**/*.exe":                  true,
+        "**/*.dll":                  true,
+        "**/flow.exe.WebView2/":     true,
+        "cli/deps/webview2/":        true,
+        "cli/deps/webview-tmp/":     true
+    }
+}

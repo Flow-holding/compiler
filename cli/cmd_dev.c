@@ -302,7 +302,8 @@ int cmd_dev(void) {
 
     {
         /* Banner stile Flow OS: angoli stondati, rombi ◆, colore #ff0087 */
-        #define W 60
+        /* W = larghezza interna (tra │ e │)                               */
+        #define W 44
         #define TL "\xE2\x95\xAD"  /* ╭ */
         #define TR "\xE2\x95\xAE"  /* ╮ */
         #define BL "\xE2\x95\xB0"  /* ╰ */
@@ -310,15 +311,37 @@ int cmd_dev(void) {
         #define HZ "\xE2\x94\x80"  /* ─ */
         #define VT "\xE2\x94\x82"  /* │ */
         #define DM "\xE2\x97\x86"  /* ◆ */
+        /* URL_W: spazio per l'URL = W - "  ◆ Xxxxxxx: "(13) - "  "(2) */
+        #define URL_W (W - 15)
         int half = (W - 10) / 2, rest = W - half - 10;
+
+        /* bordo superiore */
         printf("\n  " C_FLOW TL C_RESET);
         for (int i = 0; i < half; i++) printf(C_FLOW HZ C_RESET);
         printf(C_FLOW " Flow dev " C_RESET);
         for (int i = 0; i < rest; i++) printf(C_FLOW HZ C_RESET);
-        printf(C_FLOW TR "\n  " VT C_RESET "  " C_FLOW DM C_RESET " Local:   " C_FLOW "http://localhost:3000" C_RESET "  " C_FLOW VT C_RESET "\n  " C_FLOW VT C_RESET "  " C_FLOW DM C_RESET " Network: " C_FLOW "%-28s" C_RESET "  " C_FLOW VT C_RESET "\n  " C_FLOW BL C_RESET, neturl);
+        printf(C_FLOW TR "\n" C_RESET);
+
+        /* riga vuota in cima */
+        printf("  " C_FLOW VT C_RESET "%*s" C_FLOW VT C_RESET "\n", W, "");
+
+        /* local */
+        printf("  " C_FLOW VT C_RESET "  " C_FLOW DM C_RESET " Local:   "
+               C_FLOW "%-*s" C_RESET "  " C_FLOW VT C_RESET "\n",
+               URL_W, "http://localhost:3000");
+
+        /* network */
+        printf("  " C_FLOW VT C_RESET "  " C_FLOW DM C_RESET " Network: "
+               C_FLOW "%-*s" C_RESET "  " C_FLOW VT C_RESET "\n",
+               URL_W, neturl);
+
+        /* bordo inferiore */
+        printf("  " C_FLOW BL C_RESET);
         for (int i = 0; i < W; i++) printf(C_FLOW HZ C_RESET);
         printf(C_FLOW BR "\n\n" C_RESET);
+
         #undef W
+        #undef URL_W
         #undef TL
         #undef TR
         #undef BL

@@ -1,0 +1,23 @@
+default Home() {
+    count = 0
+
+    return (
+        <Column style={{ padding: 24, gap: 16 }}>
+            <Text
+                value="Benvenuto in {{name}}"
+                style={{ size: 28, weight: "bold", color: "#111" }}
+            />
+            <Button
+                text="Conta: {count}"
+                on:click={() => count++}
+                style={{
+                    bg:      "#3b82f6"
+                    color:   "#fff"
+                    radius:  8
+                    padding: 12
+                    hover:   { bg: "#2563eb" }
+                }}
+            />
+        </Column>
+    )
+}

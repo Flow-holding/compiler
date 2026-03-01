@@ -47,7 +47,7 @@ int config_load(FlowConfig *cfg) {
     cfg->runtime = json_str(json, "runtime");
     free(json);
 
-    if (!cfg->entry) cfg->entry = str_dup("src/main.flow");
+    if (!cfg->entry) cfg->entry = str_dup("client/root.flow");
     if (!cfg->out)   cfg->out   = str_dup("out");
 
     return 1;

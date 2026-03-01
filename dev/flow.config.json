@@ -1,10 +1,4 @@
 {
-  "name": "dev",
-  "version": "0.1.0",
-  "entry": "src/main.flow",
-  "target": ["web"],
-  "out": "out",
-  "runtime": "../runtime",
-  "flow": "../flow",
-  "flowOs": "../flow-os"
+    "runtime": "../runtime",
+    "flow":    "../flow"
 }

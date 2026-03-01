@@ -1,0 +1,6 @@
+{
+    "files.exclude": {
+        "out/":             true,
+        "*.WebView2/":      true
+    }
+}
