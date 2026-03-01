@@ -10,7 +10,7 @@ const VERSION_URL  = `https://raw.githubusercontent.com/${REPO}/main/VERSION`
 const DOWNLOAD_URL = `https://github.com/${REPO}/releases/download`
 
 // Versione corrente (aggiornata dal build script)
-export const CURRENT_VERSION = "0.3.8"
+export const CURRENT_VERSION = "0.3.9"
 
 // File cache: salva l'ultima versione vista per non fare fetch ad ogni lancio
 const CACHE_DIR  = join(process.env.LOCALAPPDATA ?? process.env.HOME ?? ".", ".flow")
