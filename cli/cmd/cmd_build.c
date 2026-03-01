@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 // ── Scansiona server/functions/ e raccoglie i nomi delle server functions ──
 // Cerca pattern "export <name> = input(" nelle prime righe di ogni .flow file

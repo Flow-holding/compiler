@@ -137,7 +137,7 @@ static void proxy_to_server(sock_t client, const char *raw_req, int raw_len) {
     }
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
-    addr.sin_port   = htons((uint16_t)g_srv_port);
+    addr.sin_port   = htons((unsigned short)g_srv_port);
     addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     if (connect(srv, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
