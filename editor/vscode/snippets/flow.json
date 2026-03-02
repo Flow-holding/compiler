@@ -1,0 +1,52 @@
+{
+  "Server function call": {
+    "prefix": "server.",
+    "body": ["server.${1|ping,greet|}()"],
+    "description": "Chiama una server function"
+  },
+  "on:click server": {
+    "prefix": "on:click",
+    "body": ["on:click={server.${1|ping,greet|}}"],
+    "description": "Click handler con server function"
+  },
+  "on:change": {
+    "prefix": "on:change",
+    "body": ["on:change={${1:handler}}"],
+    "description": "Change handler"
+  },
+  "on:blur": {
+    "prefix": "on:blur",
+    "body": ["on:blur={${1:handler}}"],
+    "description": "Blur handler"
+  },
+  "on:focus": {
+    "prefix": "on:focus",
+    "body": ["on:focus={${1:handler}}"],
+    "description": "Focus handler"
+  },
+  "export server function": {
+    "prefix": "export fn",
+    "body": ["export ${1:name} = input($2) {", "    return $3", "}"],
+    "description": "Server function"
+  },
+  "button": {
+    "prefix": "button",
+    "body": ["<button text=\"${1:label}\" on:click={${2:server.ping}} />"],
+    "description": "Pulsante con click handler"
+  },
+  "text": {
+    "prefix": "text",
+    "body": ["<text value=\"${1}\" />"],
+    "description": "Testo"
+  },
+  "col": {
+    "prefix": "col",
+    "body": ["<col>", "    $1", "</col>"],
+    "description": "Colonna"
+  },
+  "row": {
+    "prefix": "row",
+    "body": ["<row>", "    $1", "</row>"],
+    "description": "Riga"
+  }
+}

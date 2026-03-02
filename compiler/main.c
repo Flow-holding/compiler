@@ -93,7 +93,8 @@ static void pipeline(
     bool        dev_only,
     bool        fast_only,    /* --fast: solo HTML/CSS/JS, zero compilazione */
     bool        server_mode,  /* --server: genera server.c */
-    bool        outlet_only   /* --outlet: genera solo HTML interno componente */
+    bool        outlet_only,  /* --outlet: genera solo HTML interno componente */
+    bool        check_only    /* --check: solo parse, output JSON per LSP */
 ) {
     clock_t start = clock();
 
@@ -110,7 +111,7 @@ static void pipeline(
 
     // ── Lexer
     TokenList tokens = lex(&arena, source, &errors);
-    if (errors.len > 0) {
+    if (!check_only && errors.len > 0) {
         for (int i = 0; i < errors.len; i++)
             fprintf(stderr, "  ✗ [%d:%d] %s\n",
                 errors.data[i].line, errors.data[i].col, errors.data[i].msg);
@@ -119,6 +120,28 @@ static void pipeline(
 
     // ── Parser
     Node* ast = parse(&arena, tokens, &errors);
+
+    if (check_only) {
+        /* Output JSON per LSP: [{"line":N,"col":N,"message":"..."}] */
+        printf("[");
+        for (int i = 0; i < errors.len; i++) {
+            if (i > 0) printf(",");
+            printf("{\"line\":%d,\"col\":%d,\"message\":\"",
+                errors.data[i].line, errors.data[i].col);
+            for (const char* p = errors.data[i].msg; p && *p; p++) {
+                if (*p == '"') printf("\\\"");
+                else if (*p == '\\') printf("\\\\");
+                else if (*p == '\n') printf("\\n");
+                else printf("%c", *p);
+            }
+            printf("\"}");
+        }
+        printf("]\n");
+        arena_free(&arena);
+        free(source);
+        exit(errors.len > 0 ? 1 : 0);
+    }
+
     if (errors.len > 0) {
         for (int i = 0; i < errors.len; i++)
             fprintf(stderr, "  ✗ [%d:%d] %s\n",
@@ -255,7 +278,7 @@ int main(int argc, char** argv) {
     SetConsoleOutputCP(65001);  // UTF-8
 #endif
     if (argc < 2) {
-        fprintf(stderr, "uso: flowc <file.flow> [--run] [--prod] [--js]\n");
+        fprintf(stderr, "uso: flowc <file.flow> [--run] [--prod] [--check] [--js]\n");
         return 1;
     }
 
@@ -270,6 +293,7 @@ int main(int argc, char** argv) {
     bool        fast_only      = false;  /* --fast: solo HTML/CSS/JS, zero compilazione */
     bool        server_mode    = false;  /* --server: compila come server.c */
     bool        outlet_only    = false;  /* --outlet: genera solo HTML interno del componente (per routing) */
+    bool        check_only     = false;  /* --check: solo parse, output JSON errori per LSP */
 
     for (int i = 1; i < argc; i++) {
         if (str_eq(argv[i], "--run"))       { do_run = true; continue; }
@@ -278,6 +302,7 @@ int main(int argc, char** argv) {
         if (str_eq(argv[i], "--fast"))      { fast_only = true; continue; }
         if (str_eq(argv[i], "--server"))    { server_mode = true; continue; }
         if (str_eq(argv[i], "--outlet"))    { outlet_only = true; fast_only = true; continue; }
+        if (str_eq(argv[i], "--check"))    { check_only = true; continue; }
         if (str_eq(argv[i], "--outdir")     && i + 1 < argc) { out_dir_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--runtime")    && i + 1 < argc) { runtime_arg = argv[++i]; continue; }
         if (str_eq(argv[i], "--native-map") && i + 1 < argc) { native_map_arg = argv[++i]; continue; }
@@ -318,6 +343,6 @@ int main(int argc, char** argv) {
     }
 
     pipeline(input_path, out_dir, runtime_dir, native_map_arg,
-             server_fns_arg, do_run, prod, dev_only, fast_only, server_mode, outlet_only);
+             server_fns_arg, do_run, prod, dev_only, fast_only, server_mode, outlet_only, check_only);
     return 0;
 }

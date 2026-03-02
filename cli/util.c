@@ -104,6 +104,20 @@ char *read_file(const char *path) {
     return buf;
 }
 
+int copy_file(const char *src, const char *dst) {
+    FILE *in = fopen(src, "rb");
+    if (!in) return -1;
+    FILE *out = fopen(dst, "wb");
+    if (!out) { fclose(in); return -1; }
+    char buf[8192];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0)
+        fwrite(buf, 1, n, out);
+    fclose(in);
+    fclose(out);
+    return 0;
+}
+
 /* ── process info ─────────────────────────── */
 
 char *get_cwd(void) {

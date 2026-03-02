@@ -1,9 +1,10 @@
 default Home() {
     return (
         <col>
+        
             <text value="Hello, Flow!" />
             <text value="Il router funziona." />
-            <button text="Click me" />
+            <button text="Ping Server" on:change={server.} />
         </col>
     )
 }

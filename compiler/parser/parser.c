@@ -162,7 +162,7 @@ static Node* parse_style_map(Parser* p) {
         if (check(p, TK_LBRACE)) {
             f->value = parse_style_map(p);
         } else {
-            f->value = parse_primary(p);
+            f->value = parse_expr(p);  /* schema: v.str().min(1) etc. */
         }
 
         vec_push(&n->fields, f);
@@ -375,7 +375,13 @@ static Node* parse_postfix(Parser* p) {
         if (match(p, TK_DOT)) {
             Node* n  = node_new(p, ND_MEMBER);
             n->left  = left;
-            n->name  = eat(p, TK_IDENT)->val;
+            /* v.str().min(1) — str è TK_STR_T, accetta come member name */
+            Token* mt = peek(p);
+            if (mt->kind == TK_IDENT || mt->kind == TK_STR_T || mt->kind == TK_INT_T ||
+                mt->kind == TK_FLOAT_T || mt->kind == TK_BOOL_T)
+                n->name = advance(p)->val;
+            else
+                n->name = eat(p, TK_IDENT)->val;
             if (match(p, TK_LPAREN)) {
                 n->kind = ND_CALL;
                 while (!check(p, TK_RPAREN) && !check(p, TK_EOF)) {

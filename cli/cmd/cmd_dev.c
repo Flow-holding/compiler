@@ -118,7 +118,7 @@ static void hmr_update(void) {
         "var s=document.querySelector('style'),ns=d.querySelector('style');"
         "if(s&&ns)s.textContent=ns.textContent;"
         "var m;var imp={env:{flow_print_str:function(p){var v=new Uint8Array(m.buffer),e=p;while(v[e])e++;console.log(new TextDecoder().decode(v.subarray(p,e)));},flow_eprint_str:function(p){var v=new Uint8Array(m.buffer),e=p;while(v[e])e++;console.error(new TextDecoder().decode(v.subarray(p,e)));}}};"
-        "fetch('app.wasm?t='+Date.now()).then(function(r){return r.arrayBuffer();}).then(function(b){return WebAssembly.compile(b);}).then(function(mod){return WebAssembly.instantiate(mod,imp);}).then(function(r){m=r.instance.exports.memory;window._flow=r.instance.exports;if(r.instance.exports.main)r.instance.exports.main();}).catch(function(e){console.error('HMR:',e);});"
+        "fetch('app.wasm?t='+Date.now()).then(function(r){return r.arrayBuffer();}).then(function(b){return WebAssembly.compile(b);}).then(function(mod){return WebAssembly.instantiate(mod,imp);}).then(function(r){m=r.instance.exports.memory;window._flow=r.instance.exports;if(r.instance.exports.main)r.instance.exports.main();}).catch(function(e){var m=(e&&e.message)||String(e),s=(e&&e.stack)||'';(window._flowErrorOverlay||console.error)(m,s);});"
         "})();", esc);
     free(esc);
     if (!js) return;
@@ -142,8 +142,12 @@ static void proxy_to_server(sock_t client, const char *raw_req, int raw_len) {
 
     if (connect(srv, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         sock_close(srv);
-        const char *err = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 19\r\nConnection: close\r\n\r\nServer not running";
-        sock_send(client, err, (int)strlen(err));
+        const char *body = "{\"ok\":false,\"error\":\"Server non disponibile\",\"hint\":\"Il server non e' in esecuzione. Controlla che server.exe sia stato compilato.\"}";
+        char hdr[256];
+        int len = (int)snprintf(hdr, sizeof(hdr),
+            "HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n%s",
+            strlen(body), body);
+        sock_send(client, hdr, len);
         return;
     }
 
@@ -155,6 +159,16 @@ static void proxy_to_server(sock_t client, const char *raw_req, int raw_len) {
         sock_send(client, buf, n);
 
     sock_close(srv);
+}
+
+/* ── Termina server.exe precedente (per HMR) ───────────────────────────── */
+static void kill_server(void) {
+#ifdef _WIN32
+    system("taskkill /IM server.exe /F >nul 2>&1");
+#else
+    system("pkill -f 'server.exe' 2>/dev/null || true");
+#endif
+    sleep_ms(100);
 }
 
 /* ── Avvia server.exe in background ────────────────────────────────────── */
@@ -213,9 +227,9 @@ static void serve_client(sock_t client) {
         sock_close(client); return;
     }
 
-    // Proxy: /_flow/fn/* e /api/* → server process
+    // Proxy: /_flow/fn/* e /api, /api/* → server process
     if (strncmp(urlpath, "/_flow/fn/", 10) == 0 ||
-        strncmp(urlpath, "/api/", 5) == 0) {
+        (strncmp(urlpath, "/api", 4) == 0 && (urlpath[4] == '/' || urlpath[4] == '\0'))) {
         proxy_to_server(client, req, total);
         sock_close(client);
         return;
@@ -224,6 +238,8 @@ static void serve_client(sock_t client) {
     char *q = strchr(urlpath, '?');
     if (q) *q = '\0';
     if (strcmp(urlpath, "/") == 0) strcpy(urlpath, "/index.html");
+    /* favicon.ico → favicon.png (stesso file) */
+    if (strcmp(urlpath, "/favicon.ico") == 0) strcpy(urlpath, "/favicon.png");
     if (strstr(urlpath, "..")) {
         sock_send(client, "HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n", 45);
         sock_close(client); return;
@@ -284,33 +300,40 @@ static void *http_thread(void *arg) {
 #endif
 }
 
-/* ── File watcher ──────────────────────────────────────────────────────── */
+/* ── File watcher (client + server) ──────────────────────────────────────── */
 
 typedef struct { char **paths; long long *mtimes; int n; } WatchState;
 
-static WatchState watch_init(const char *srcdir) {
+static void watch_merge(char ***out, int *out_n, const char *dir) {
+    int n2;
+    char **p2 = glob_flow(dir, &n2);
+    if (!p2 || n2 == 0) return;
+    int cur = *out_n;
+    char **newp = realloc(*out, (cur + n2) * sizeof(char*));
+    if (!newp) { for (int i = 0; i < n2; i++) free(p2[i]); free(p2); return; }
+    *out = newp;
+    for (int i = 0; i < n2; i++) (*out)[cur + i] = p2[i];
+    *out_n = cur + n2;
+    free(p2);
+}
+
+static WatchState watch_init(const char *client_dir, const char *server_dir) {
     WatchState ws = {0};
-    ws.paths  = glob_flow(srcdir, &ws.n);
+    watch_merge(&ws.paths, &ws.n, client_dir);
+    if (path_exists(server_dir)) watch_merge(&ws.paths, &ws.n, server_dir);
     ws.mtimes = malloc(ws.n * sizeof(long long));
     for (int i = 0; i < ws.n; i++) ws.mtimes[i] = file_mtime(ws.paths[i]);
     return ws;
 }
 
-static int watch_changed(WatchState *ws, const char *srcdir) {
-    int n2; char **p2 = glob_flow(srcdir, &n2);
-    int changed = (n2 != ws->n);
-    for (int i = 0; !changed && i < ws->n; i++)
+static int watch_changed(WatchState *ws, const char *client_dir, const char *server_dir) {
+    WatchState ws2 = watch_init(client_dir, server_dir);
+    int changed = (ws2.n != ws->n);
+    for (int i = 0; !changed && i < ws->n && i < ws2.n; i++)
         if (file_mtime(ws->paths[i]) != ws->mtimes[i]) changed = 1;
-    if (changed) {
-        for (int i = 0; i < ws->n; i++) free(ws->paths[i]);
-        free(ws->paths); free(ws->mtimes);
-        ws->paths = p2; ws->n = n2;
-        ws->mtimes = malloc(n2 * sizeof(long long));
-        for (int i = 0; i < n2; i++) ws->mtimes[i] = file_mtime(p2[i]);
-    } else {
-        for (int i = 0; i < n2; i++) free(p2[i]);
-        free(p2);
-    }
+    for (int i = 0; i < ws->n; i++) free(ws->paths[i]);
+    free(ws->paths); free(ws->mtimes);
+    ws->paths = ws2.paths; ws->n = ws2.n; ws->mtimes = ws2.mtimes;
     return changed;
 }
 
@@ -319,19 +342,24 @@ static DWORD WINAPI watcher_thread(LPVOID arg) {
 #else
 static void *watcher_thread(void *arg) {
 #endif
-    char *srcdir = (char*)arg;
-    WatchState ws = watch_init(srcdir);
+    char **dirs = (char**)arg;
+    char *client_dir = dirs[0];
+    char *server_dir = dirs[1];
+    char *outdir = dirs[2];
+    WatchState ws = watch_init(client_dir, server_dir);
     int pending = 0, last = 0, tick = 0;
 
     while (g_running) {
         sleep_ms(5);
         if (!g_running) break;
         tick++;
-        if (watch_changed(&ws, srcdir)) { pending = 1; last = tick; }
+        if (watch_changed(&ws, client_dir, server_dir)) { pending = 1; last = tick; }
         if (!pending || tick - last < 1) continue;
         pending = 0;
 
         cmd_build(0, 0, 1, 0);
+        kill_server();
+        spawn_server(outdir);  /* restart server quando sorgenti cambiano */
         hmr_update();
     }
     for (int i = 0; i < ws.n; i++) free(ws.paths[i]);
@@ -447,31 +475,47 @@ int cmd_dev(void) {
     g_wv = wv_create(1024, 768, "Flow dev");
     if (g_wv) {
         wv_navigate(g_wv, "http://localhost:3000");
-#ifdef _WIN32
-        CreateThread(NULL, 0, watcher_thread, srcdir, 0, NULL);
-#else
         {
-            pthread_t wtid;
-            pthread_create(&wtid, NULL, watcher_thread, srcdir);
-            pthread_detach(wtid);
-        }
+            char *srvdir = path_join(cwd, "server");
+            char **watch_dirs = malloc(4 * sizeof(char*));
+            if (watch_dirs) {
+                watch_dirs[0] = srcdir;
+                watch_dirs[1] = srvdir;
+                watch_dirs[2] = outdir;
+                watch_dirs[3] = NULL;
+#ifdef _WIN32
+                CreateThread(NULL, 0, watcher_thread, watch_dirs, 0, NULL);
+#else
+                {
+                    pthread_t wtid;
+                    pthread_create(&wtid, NULL, watcher_thread, watch_dirs);
+                    pthread_detach(wtid);
+                }
 #endif
+            } else {
+                free(srvdir);
+            }
+        }
         wv_run(g_wv);
         g_running = 0;
         wv_destroy(g_wv);
         g_wv = NULL;
     } else {
-        WatchState ws = watch_init(srcdir);
+        char *srvdir = path_join(cwd, "server");
+        WatchState ws = watch_init(srcdir, srvdir);
         int pending = 0, last = 0, tick = 0;
         while (g_running) {
             sleep_ms(50); tick++;
-            if (watch_changed(&ws, srcdir)) { pending = 1; last = tick; }
+            if (watch_changed(&ws, srcdir, srvdir)) { pending = 1; last = tick; }
             if (!pending || tick - last < 2) continue;
             pending = 0;
             cmd_build(0, 0, 1, 0);
+            kill_server();
+            spawn_server(outdir);
         }
         for (int i = 0; i < ws.n; i++) free(ws.paths[i]);
         free(ws.paths); free(ws.mtimes);
+        free(srvdir);
     }
 
     printf(C_FLOW "\n  \u2190" C_RESET " stop\n");

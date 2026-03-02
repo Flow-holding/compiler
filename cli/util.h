@@ -18,6 +18,7 @@ int        mkdir_p(const char *path);
 /* File I/O */
 int        write_file(const char *path, const char *content);
 char      *read_file(const char *path);                 /* caller frees */
+int        copy_file(const char *src, const char *dst); /* copia binaria */
 
 /* Process info */
 char      *get_cwd(void);                               /* caller frees */

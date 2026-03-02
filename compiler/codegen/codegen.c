@@ -440,6 +440,25 @@ Str codegen_c(Arena* a, Node* program, CodegenTarget target, const char* runtime
 
 static int html_compact = 1;  // minify: no indent/newlines
 
+// Serializza expr semplice per data-fl-on-* (es. server.ping → "server.ping")
+static void gen_expr_to_attr(Str* out, Node* n) {
+    if (!n) return;
+    if (n->kind == ND_CALL && n->left) n = n->left;  // server.ping() → server.ping
+    if (n->kind == ND_MEMBER && n->left) {
+        if (n->left->kind == ND_IDENT)
+            str_catf(out, "%s.%s", n->left->name ? n->left->name : "", n->name ? n->name : "");
+        else {
+            gen_expr_to_attr(out, n->left);
+            str_catf(out, ".%s", n->name ? n->name : "");
+        }
+        return;
+    }
+    if (n->kind == ND_IDENT && n->name)
+        str_cat(out, n->name);
+    else if (n->kind == ND_LIT_STRING && n->value)
+        str_catf(out, "%s", n->value ? n->value : "");
+}
+
 // Dichiara prima di gen_ui_node (mutual recursion)
 static void gen_ui_node(Str* html, Node* n, int ind);
 
@@ -570,10 +589,10 @@ static void gen_ui_node(Str* html, Node* n, int ind) {
         else if (str_eq(f->name, "placeholder") && f->value)
             str_catf(html, " placeholder=\"%s\"", f->value->value ? f->value->value : "");
         else if (f->name && f->name[0] == 'o' && f->name[1] == 'n' && f->name[2] == ':') {
-            // on:event={handler} → data-fl-on-event="code"
-            char attr[64];
-            snprintf(attr, sizeof(attr), " data-fl-on-%s", f->name + 3);
-            str_cat(html, attr);
+            // on:click={server.ping} → data-fl-on-click="server.ping"
+            str_catf(html, " data-fl-on-%s=\"", f->name + 3);
+            gen_expr_to_attr(html, f->value);
+            str_cat(html, "\"");
         }
     }
     str_cat(html, html_compact ? ">" : ">\n");
@@ -599,11 +618,35 @@ Str codegen_html(Arena* a, Node* program) {
     str_cat(&out,
         "<!DOCTYPE html><html lang=\"it\"><head>"
         "<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<link rel=\"icon\" href=\"favicon.png\" type=\"image/png\">"
         "<title>Flow App</title>"
         "<style>");
     str_cat(&out, css.data);
     str_cat(&out,
-        "</style></head><body><div id=\"root\">");
+        "</style></head><body>"
+        "<script>"
+        "(function(){"
+        "function _flowErr(m,s){"
+        "var o=document.getElementById('_flow-err');"
+        "if(!o){o=document.createElement('div');o.id='_flow-err';"
+        "o.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(20,20,30,0.92);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;';"
+        "var b=document.createElement('div');"
+        "b.style.cssText='max-width:min(520px,92vw);background:#1e1e2e;color:#cdd6f4;border-radius:12px;padding:0;box-shadow:0 25px 50px rgba(0,0,0,0.5);border-left:4px solid #f38ba8;overflow:hidden';"
+        "b.innerHTML='<div style=\"padding:16px 20px;background:#313244;color:#f38ba8;font-weight:600;font-size:14px;\">Flow Error</div>'"
+        "+'<div style=\"padding:20px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;\" id=\"_flow-err-msg\"></div>'"
+        "+'<div style=\"padding:12px 20px;background:#181825;font-size:11px;color:#a6adc8;max-height:120px;overflow:auto;\" id=\"_flow-err-stack\"></div>'"
+        "+'<button style=\"margin:16px 20px;padding:10px 20px;background:#45475a;color:#cdd6f4;border:none;border-radius:8px;cursor:pointer;font-size:13px;\" onclick=\"document.getElementById(\\'_flow-err\\').remove()\">Chiudi</button>';"
+        "o.appendChild(b);document.body.appendChild(o);}"
+        "var msg=document.getElementById('_flow-err-msg');"
+        "var stk=document.getElementById('_flow-err-stack');"
+        "if(msg)msg.textContent=m||'Errore sconosciuto';"
+        "if(stk)stk.textContent=s||'';"
+        "}"
+        "window._flowErrorOverlay=_flowErr;"
+        "window.onerror=function(m,u,l,c,e){_flowErr(m,(e&&e.stack)||'');return false;};"
+        "window.onunhandledrejection=function(e){_flowErr(e.reason&&(e.reason.message||String(e.reason)),e.reason&&e.reason.stack);};"
+        "})();"
+        "</script><div id=\"root\">");
 
     for (int i = 0; i < program->children.len; i++) {
         Node* n = (Node*)program->children.data[i];
@@ -689,7 +732,7 @@ Str codegen_js(Arena* a, Node* program, const char* server_fns) {
         "function loadWasm(){"
         "WebAssembly.instantiateStreaming(fetch('app.wasm',{cache:'no-cache'}),imports)"
         ".then(({instance})=>{wasmMem=instance.exports.memory;window._flow=instance.exports;if(instance.exports.main)instance.exports.main();})"
-        ".catch(e=>console.error('WASM error:',e));}"
+        ".catch(e=>{(window._flowErrorOverlay||console.error)('WASM: '+(e.message||e),(e.stack||''));});"
         "document.readyState==='loading'?document.addEventListener('DOMContentLoaded',loadWasm):loadWasm();\n");
 
     // ── ctx.shared helper ─────────────────────────────────────────
@@ -752,6 +795,30 @@ Str codegen_js(Arena* a, Node* program, const char* server_fns) {
             tok = strtok(NULL, ",");
         }
         str_cat(&out, "};\n");
+        /* Bind on:click, on:change, on:blur, on:focus — utility generiche */
+        str_cat(&out,
+            "(function _flowBind(){"
+            "function _flowShow(msg){var t=document.getElementById('_flow-toast');"
+            "if(!t){t=document.createElement('div');t.id='_flow-toast';"
+            "t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:12px 24px;border-radius:8px;z-index:9999;font-family:monospace;font-size:13px;max-width:90vw;';"
+            "document.body.appendChild(t);}"
+            "t.textContent=msg;t.style.display='block';setTimeout(function(){t.style.display='none';},3000);}"
+            "function bind(el,ev,code){"
+            "if(!code)return;"
+            "var h=async function(){try{"
+            "if(code.indexOf('server.')===0){var fn=code.split('.')[1];if(!fn||!server[fn]){_flowShow('server.'+fn+' non valido');return;}var r=await server[fn]({});_flowShow(JSON.stringify(r));}"
+            "else{_flowShow('Handler: '+code);}"
+            "}catch(e){_flowShow('Errore: '+e.message);}"
+            "};"
+            "el.addEventListener(ev,h);}"
+            "function run(){"
+            "['click','change','blur','focus'].forEach(function(ev){"
+            "document.querySelectorAll('[data-fl-on-'+ev+']').forEach(function(el){"
+            "bind(el,ev,el.getAttribute('data-fl-on-'+ev));});});"
+            "}"
+            "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}"
+            "else{run();}"
+            "})();\n");
         free(fn_names.data);
     }
 
@@ -785,21 +852,22 @@ static void gen_json_expr(Str* out, Node* n) {
             break;
         }
         case ND_LIT_BOOL: {
-            str_cat(out, str_eq(n->value, "true") ? "\"true\"" : "\"false\"");
+            str_cat(out, str_eq(n->value, "true") ? "flow_json_bool(1)" : "flow_json_bool(0)");
             break;
         }
         case ND_LIT_NULL:
             str_cat(out, "\"null\"");
             break;
         case ND_LIT_MAP: {
-            // { k: v, ... } → dynamic JSON builder
-            str_cat(out, "flow_json_obj_begin()");
+            // { k: v, ... } → flow_json_obj("k", val, ..., NULL)
+            str_cat(out, "flow_json_obj_begin()(");
             for (int i = 0; i < n->fields.len; i++) {
+                if (i > 0) str_cat(out, ", ");
                 Field* f = (Field*)n->fields.data[i];
-                str_catf(out, ",\"%s\",", f->name ? f->name : "");
+                str_catf(out, "\"%s\", ", f->name ? f->name : "");
                 gen_json_expr(out, f->value);
             }
-            str_cat(out, ",NULL)");
+            str_cat(out, ", NULL)");
             break;
         }
         default:
@@ -952,7 +1020,7 @@ static void gen_server_fn_handler(Str* out, Node* n) {
         for (int i = 0; i < n->left->fields.len; i++) {
             Field* f = (Field*)n->left->fields.data[i];
             if (i > 0) str_cat(out, ", ");
-            str_catf(out, "._data_%s = _data_%s", f->name, f->name);
+            str_catf(out, ".%s = _data_%s", f->name, f->name);
         }
         str_cat(out, " };\n");
     }
@@ -1036,8 +1104,21 @@ Str codegen_server_c(Arena* a, Node* program, const char* runtime_dir, int port)
         }
     }
 
+    // Handler default GET /api
+    str_cat(&out,
+        "static FlowRes* flow_api_root(FlowReq *req) {\n"
+        "    (void)req;\n"
+        "    FlowRes *r = (FlowRes*)calloc(1, sizeof(FlowRes));\n"
+        "    r->status = 200;\n"
+        "    r->body_len = snprintf(r->body, sizeof(r->body), \"{\\\"status\\\":\\\"ok\\\",\\\"message\\\":\\\"Flow API\\\"}\");\n"
+        "    snprintf(r->content_type, sizeof(r->content_type), \"application/json\");\n"
+        "    return r;\n"
+        "}\n\n");
+
     // flow_register_all
     str_cat(&out, "static void flow_register_all(void) {\n");
+    str_cat(&out, "    flow_route(\"GET\", \"/api\", flow_api_root);\n");
+    str_cat(&out, "    flow_route(\"GET\", \"/api/\", flow_api_root);\n");
     for (int i = 0; i < program->children.len; i++) {
         Node* n = (Node*)program->children.data[i];
         if (n->kind == ND_SERVER_FN)

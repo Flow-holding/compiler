@@ -67,6 +67,18 @@ int cmd_build(int prod, int run_flag, int dev, int fast) {
     char *runtime     = cfg.runtime ? path_join(cwd, cfg.runtime) : NULL;
     char *flow_stdlib = cfg.flow    ? path_join(cwd, cfg.flow)    : NULL;
 
+    /* Fallback: se runtime/flow non in config, prova ../ (monorepo) */
+    if (!runtime) {
+        char *try_rt = path_join(cwd, ".." SEP "runtime");
+        if (path_exists(try_rt)) runtime = try_rt;
+        else free(try_rt);
+    }
+    if (!flow_stdlib) {
+        char *try_fl = path_join(cwd, ".." SEP "flow");
+        if (path_exists(try_fl)) flow_stdlib = try_fl;
+        else free(try_fl);
+    }
+
     if (!path_exists(entry)) {
         fprintf(stderr, C_RED "✗" C_RESET " entry point non trovato: %s\n", entry);
         code = 1;
@@ -97,7 +109,7 @@ int cmd_build(int prod, int run_flag, int dev, int fast) {
             printf(C_FLOW "▲" C_RESET " Building server...\n");
             int srv_rc = run_flowc_server(srv_entry, outdir, runtime, flow_stdlib, prod);
             if (srv_rc != 0) {
-                fprintf(stderr, C_RED "⚠" C_RESET " Server build saltata (flowc aggiornato?)\n");
+                fprintf(stderr, C_RED "⚠" C_RESET " Server non compilato — le server functions non saranno disponibili\n");
                 srv_fns[0] = '\0';  // non iniettare stubs se server non compilato
             }
 
@@ -110,6 +122,19 @@ int cmd_build(int prod, int run_flag, int dev, int fast) {
     // ── 2. Build client (root.flow → index.html / app.js / app.wasm) ────────
     code = run_flowc(entry, outdir, runtime, flow_stdlib,
                      prod, run_flag, dev, fast, srv_fns[0] ? srv_fns : NULL);
+
+    // Copia favicon (icona Flow) se esiste
+    if (code == 0) {
+        char fav_dst[4096];
+        snprintf(fav_dst, sizeof(fav_dst), "%s" SEP "favicon.png", outdir);
+        char *parent = path_dirname(cwd);
+        char *fav_src = path_join(parent, "editor" SEP "vscode" SEP "icons" SEP "flow-file.png");
+        free(parent);
+        if (path_exists(fav_src)) {
+            copy_file(fav_src, fav_dst);
+        }
+        free(fav_src);
+    }
 
     // ── 3. Compila route e inietta in #fl-outlet ──────────────────────────
     // Scansiona client/routes/*.flow — la prima route trovata (index.flow
